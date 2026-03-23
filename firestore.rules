@@ -63,6 +63,8 @@ service cloud.firestore {
         "adminConfirmedAt",
         "adminConfirmedByUserId",
         "adminConfirmedByUserName",
+        "requiresRegistrarAction",
+        "pendingDoctorEdit",
         "updatedAt"
       ]);
     }
@@ -79,6 +81,34 @@ service cloud.firestore {
         request.resource.data.pendingRegistrarUpdate.registrarComment.size() > 0 &&
         request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
         request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
+    }
+
+    function doctorDirectEditFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "currentStatus",
+        "finalDecision",
+        "requiresRegistrarAction",
+        "pendingDoctorEdit",
+        "lastDoctorEditAt",
+        "lastDoctorEditByUserId",
+        "lastDoctorEditByUserName",
+        "lastDoctorEditByUserEmail",
+        "lastDoctorEditComment",
+        "updatedAt"
+      ]);
+    }
+
+    function doctorDirectEditPayloadIsValid() {
+      return request.resource.data.requiresRegistrarAction == true &&
+        request.resource.data.lastDoctorEditComment is string &&
+        request.resource.data.lastDoctorEditComment.size() > 0 &&
+        request.resource.data.lastDoctorEditByUserId == request.auth.uid &&
+        request.resource.data.lastDoctorEditByUserEmail == userEmail() &&
+        request.resource.data.pendingDoctorEdit != null &&
+        request.resource.data.pendingDoctorEdit.comment is string &&
+        request.resource.data.pendingDoctorEdit.comment.size() > 0 &&
+        request.resource.data.pendingDoctorEdit.editedByUserId == request.auth.uid &&
+        request.resource.data.pendingDoctorEdit.editedByUserEmail == userEmail();
     }
 
     function registrarPendingUpdatePayloadIsValid() {
@@ -125,7 +155,8 @@ service cloud.firestore {
         (
           isDoctor() &&
           isRequestOwner() &&
-          resource.data.currentStatus == "ახალი"
+          doctorDirectEditFieldsOnly() &&
+          doctorDirectEditPayloadIsValid()
         );
 
       allow delete: if isAdmin();

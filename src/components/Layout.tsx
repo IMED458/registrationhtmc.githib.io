@@ -146,6 +146,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {isAdmin && (
               <NavLink
+                to="/admin-requests"
+                className={navItemClassName}
+                title="მოთხოვნები"
+              >
+                <ClipboardList className="w-5 h-5 text-slate-400" />
+                {!isSidebarCollapsed && 'მოთხოვნები'}
+              </NavLink>
+            )}
+
+            {isAdmin && (
+              <NavLink
                 to="/settings"
                 className={navItemClassName}
                 title="პარამეტრები"
@@ -163,7 +174,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
-        <div className="grid grid-cols-3 gap-2">
+        <div className={`grid gap-2 ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <NavLink to="/" className={mobileNavItemClassName}>
             <LayoutDashboard className="h-5 w-5" />
             <span className="text-xs">მთავარი</span>
@@ -179,6 +190,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               მოთხოვნა
             </div>
           )}
+
+          {isAdmin ? (
+            <NavLink to="/admin-requests" className={mobileNavItemClassName}>
+              <ClipboardList className="h-5 w-5" />
+              <span className="text-xs">მოთხოვნები</span>
+            </NavLink>
+          ) : null}
 
           {isAdmin ? (
             <NavLink to="/settings" className={mobileNavItemClassName}>

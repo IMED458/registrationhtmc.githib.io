@@ -7,6 +7,7 @@ import NewRequestPage from './pages/NewRequestPage';
 import RequestDetailsPage from './pages/RequestDetailsPage';
 import PrintPage from './pages/PrintPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
+import AdminRequestsPage from './pages/AdminRequestsPage';
 import FirebaseSetupPage from './pages/FirebaseSetupPage';
 import { isFirebaseConfigured } from './firebase';
 
@@ -75,6 +76,12 @@ export default function App() {
           <Route path="/settings" element={
             <ProtectedRoute>
               <AdminSettingsPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin-requests" element={
+            <ProtectedRoute>
+              <AdminRequestsPage />
             </ProtectedRoute>
           } />
 

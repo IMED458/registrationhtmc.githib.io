@@ -33,6 +33,14 @@ export interface PendingRegistrarUpdate {
   requestedByUserName: string;
 }
 
+export interface PendingDoctorEdit {
+  comment: string;
+  editedAt: any;
+  editedByUserEmail?: string;
+  editedByUserId: string;
+  editedByUserName: string;
+}
+
 export interface ClinicalRequest {
   id: string;
   patientData: Patient;
@@ -59,6 +67,13 @@ export interface ClinicalRequest {
   adminConfirmedAt?: any;
   adminConfirmedByUserId?: string;
   adminConfirmedByUserName?: string;
+  requiresRegistrarAction?: boolean;
+  pendingDoctorEdit?: PendingDoctorEdit | null;
+  lastDoctorEditAt?: any;
+  lastDoctorEditByUserId?: string;
+  lastDoctorEditByUserName?: string;
+  lastDoctorEditByUserEmail?: string;
+  lastDoctorEditComment?: string;
   currentStatus: RequestStatus;
   createdAt: any;
   updatedAt: any;

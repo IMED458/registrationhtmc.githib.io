@@ -31,6 +31,18 @@ function getRequestTimestampValue(request: ClinicalRequest) {
   return 0;
 }
 
+function getRequestUpdatedTimestampValue(request: ClinicalRequest) {
+  if (request.updatedAt?.toMillis) {
+    return request.updatedAt.toMillis();
+  }
+
+  if (request.updatedAt?.seconds) {
+    return request.updatedAt.seconds * 1000;
+  }
+
+  return getRequestTimestampValue(request);
+}
+
 function getRequestActionLabel(request: ClinicalRequest) {
   if (request.consentStatus?.startsWith('უარი')) {
     return request.consentStatus;
@@ -63,6 +75,16 @@ function getRegistrarEditLabel(request: ClinicalRequest) {
       : 'რედაქტირდა';
 }
 
+function needsRegistrarRework(request: ClinicalRequest) {
+  return Boolean(request.requiresRegistrarAction && request.pendingDoctorEdit);
+}
+
+function getPatientNameTextClass(request: ClinicalRequest) {
+  return needsRegistrarRework(request)
+    ? 'text-sky-600'
+    : 'text-slate-900';
+}
+
 function getRegistrarEditTextClass(request: ClinicalRequest) {
   return request.adminConfirmationStatus === 'pending'
     ? 'text-amber-700'
@@ -73,7 +95,16 @@ function getRegistrarEditTextClass(request: ClinicalRequest) {
 
 function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
   return [...requests].sort(
-    (left, right) => getRequestTimestampValue(right) - getRequestTimestampValue(left),
+    (left, right) => {
+      const priorityDiff =
+        Number(needsRegistrarRework(right)) - Number(needsRegistrarRework(left));
+
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return getRequestUpdatedTimestampValue(right) - getRequestUpdatedTimestampValue(left);
+    },
   );
 }
 
@@ -398,12 +429,17 @@ export default function Dashboard() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-base font-bold text-slate-900">
+                  <div className={`text-base font-bold ${getPatientNameTextClass(req)}`}>
                     {req.patientData.firstName} {req.patientData.lastName}
                   </div>
                   <div className="mt-1 text-xs text-slate-400">
                     {req.patientData.historyNumber} / {req.patientData.personalId}
                   </div>
+                  {needsRegistrarRework(req) && (
+                    <div className="mt-1 text-xs font-bold text-sky-600">
+                      შეცვლილია და ელოდება ახლიდან მოქმედებას
+                    </div>
+                  )}
                 </div>
                 <span className={cn(
                   "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
@@ -464,6 +500,14 @@ export default function Dashboard() {
                     <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">რედაქტირების სტატუსი</div>
                     <div className={`mt-1 text-sm font-bold ${getRegistrarEditTextClass(req)}`}>
                       {getRegistrarEditLabel(req)}
+                    </div>
+                  </div>
+                )}
+                {needsRegistrarRework(req) && (
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-sky-600">ახალი ცვლილება</div>
+                    <div className="mt-1 text-sm font-bold text-sky-600">
+                      ექიმმა/ექთანმა შეცვალა ჩანაწერი და რეგისტრატორის მოქმედებას ელოდება
                     </div>
                   </div>
                 )}
@@ -533,7 +577,12 @@ export default function Dashboard() {
                 filteredRequests.map((req) => (
                   <tr key={req.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{req.patientData.firstName} {req.patientData.lastName}</div>
+                      <div className={`font-bold ${getPatientNameTextClass(req)}`}>{req.patientData.firstName} {req.patientData.lastName}</div>
+                      {needsRegistrarRework(req) && (
+                        <div className="mt-1 text-xs font-bold text-sky-600">
+                          შეცვლილია და ელოდება ახლიდან მოქმედებას
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {(() => {
@@ -583,6 +632,11 @@ export default function Dashboard() {
                         {req.lastRegistrarEditAt && (
                           <div className={`max-w-xs text-sm font-bold leading-5 whitespace-normal ${getRegistrarEditTextClass(req)}`}>
                             {getRegistrarEditLabel(req)}
+                          </div>
+                        )}
+                        {needsRegistrarRework(req) && (
+                          <div className="max-w-xs text-sm font-bold leading-5 whitespace-normal text-sky-600">
+                            ექიმის ცვლილება რეგისტრატორის ხელახლა მოქმედებას ელოდება
                           </div>
                         )}
                       </div>

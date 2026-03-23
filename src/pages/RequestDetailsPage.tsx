@@ -6,7 +6,7 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisDisplayParts } from '../icd10Utils';
-import { ClinicalRequest, PendingRegistrarUpdate } from '../types';
+import { ClinicalRequest, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User } from 'lucide-react';
 import { format } from 'date-fns';
@@ -39,6 +39,23 @@ function getPendingUpdateSignature(update?: PendingRegistrarUpdate | null) {
   ].join('|');
 }
 
+function getPendingDoctorEditSignature(update?: PendingDoctorEdit | null) {
+  if (!update) {
+    return '';
+  }
+
+  const editedAt = update.editedAt?.toMillis
+    ? update.editedAt.toMillis()
+    : update.editedAt?.seconds || '';
+
+  return [
+    update.comment || '',
+    update.editedByUserId,
+    update.editedByUserEmail || '',
+    editedAt,
+  ].join('|');
+}
+
 function hasRegistrarSyncChange(current: ClinicalRequest, next: ClinicalRequest) {
   return (
     current.currentStatus !== next.currentStatus ||
@@ -47,6 +64,10 @@ function hasRegistrarSyncChange(current: ClinicalRequest, next: ClinicalRequest)
     (current.registrarName || '') !== (next.registrarName || '') ||
     (current.formFillerName || '') !== (next.formFillerName || '') ||
     (current.adminConfirmationStatus || '') !== (next.adminConfirmationStatus || '') ||
+    Boolean(current.requiresRegistrarAction) !== Boolean(next.requiresRegistrarAction) ||
+    (current.lastDoctorEditComment || '') !== (next.lastDoctorEditComment || '') ||
+    getPendingDoctorEditSignature(current.pendingDoctorEdit) !==
+      getPendingDoctorEditSignature(next.pendingDoctorEdit) ||
     getPendingUpdateSignature(current.pendingRegistrarUpdate) !==
       getPendingUpdateSignature(next.pendingRegistrarUpdate)
   );
@@ -70,7 +91,7 @@ function getDefaultFormFillerName(request?: ClinicalRequest | null, fallbackName
 
 export default function RequestDetailsPage() {
   const { id } = useParams();
-  const { profile, isRegistrar, isAdmin } = useAuth();
+  const { profile, isRegistrar, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
   const [request, setRequest] = useState<ClinicalRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,12 +111,20 @@ export default function RequestDetailsPage() {
     registrarComment: '',
     registrarName: '',
     formFillerName: '',
+    doctorEditComment: '',
   });
 
   const isRegistrarOnly = isRegistrar && !isAdmin;
+  const isRequestOwner =
+    !!request &&
+    !!profile &&
+    (request.createdByUserId === profile.uid || request.createdByUserEmail === profile.email);
+  const canDoctorEdit = isDoctorOrNurse && isRequestOwner && !isAdmin && !isRegistrar;
+  const canManageRequest = isRegistrar || isAdmin || canDoctorEdit;
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
     : null;
+  const pendingDoctorEdit = request?.requiresRegistrarAction ? request?.pendingDoctorEdit || null : null;
 
   useEffect(() => {
     if (!id || !profile || !request || !isRegistrarOnly) {
@@ -179,6 +208,7 @@ export default function RequestDetailsPage() {
             registrarComment: data.registrarComment || '',
             registrarName: data.registrarName || profile?.fullName || '',
             formFillerName: data.formFillerName || getDefaultFormFillerName(data, profile?.fullName) || '',
+            doctorEditComment: data.lastDoctorEditComment || '',
           }));
         }
 
@@ -227,6 +257,11 @@ export default function RequestDetailsPage() {
 
     if (isRegistrarOnly && !formData.registrarComment.trim()) {
       setFormError('რეგისტრატორის ცვლილების შესანახად კომენტარი სავალდებულოა.');
+      return;
+    }
+
+    if (canDoctorEdit && !formData.doctorEditComment.trim()) {
+      setFormError('ექიმის/ექთნის ცვლილების შესანახად კომენტარი სავალდებულოა.');
       return;
     }
 
@@ -312,6 +347,8 @@ export default function RequestDetailsPage() {
           adminConfirmedAt: null,
           adminConfirmedByUserId: '',
           adminConfirmedByUserName: '',
+          requiresRegistrarAction: false,
+          pendingDoctorEdit: null,
         });
 
         await writeAuditLogEntry({
@@ -327,6 +364,43 @@ export default function RequestDetailsPage() {
         setSuccessDialogContent({
           title: 'ცვლილება შენახულია',
           message: 'ჩანაწერი დარედაქტირდა და ადმინისტრატორთან შეტყობინება ავტომატურად გაიგზავნა.',
+        });
+        return;
+      }
+
+      if (canDoctorEdit) {
+        const doctorNotification: PendingDoctorEdit = {
+          comment: formData.doctorEditComment.trim(),
+          editedAt: Timestamp.now(),
+          editedByUserEmail: profile.email,
+          editedByUserId: profile.uid,
+          editedByUserName: profile.fullName,
+        };
+
+        await updateDoc(requestRef, {
+          ...baseUpdate,
+          requiresRegistrarAction: true,
+          pendingDoctorEdit: doctorNotification,
+          lastDoctorEditAt: Timestamp.now(),
+          lastDoctorEditByUserId: profile.uid,
+          lastDoctorEditByUserName: profile.fullName,
+          lastDoctorEditByUserEmail: profile.email,
+          lastDoctorEditComment: formData.doctorEditComment.trim(),
+        });
+
+        await writeAuditLogEntry({
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: id,
+          actionType: 'DOCTOR_EDIT',
+          oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
+          newValue: `${getUpdateSummary(formData.currentStatus, formData.finalDecision)} / კომენტარი: ${formData.doctorEditComment.trim()}`,
+        });
+
+        setConfirmAction(null);
+        setSuccessDialogContent({
+          title: 'ცვლილება შენახულია',
+          message: 'ჩანაწერი განახლდა და რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა.',
         });
         return;
       }
@@ -387,7 +461,9 @@ export default function RequestDetailsPage() {
             ? 'ნამდვილად გსურთ რეგისტრატორის მიერ შეტანილი ცვლილების დადასტურება?'
             : isRegistrarOnly
               ? 'ცვლილება დაუყოვნებლივ შეინახება და ადმინთან შეტყობინებაც გაიგზავნება. გაგრძელება გსურთ?'
-              : 'ნამდვილად გსურთ სტატუსის განახლება?',
+              : canDoctorEdit
+                ? 'ცვლილება დაუყოვნებლივ შეინახება და რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. გაგრძელება გსურთ?'
+                : 'ნამდვილად გსურთ სტატუსის განახლება?',
         confirmLabel: confirmAction === 'approve' ? 'დადასტურება' : 'OK',
       }
     : null;
@@ -543,12 +619,60 @@ export default function RequestDetailsPage() {
                         : '-'}
                   </div>
                 </div>
+                {request.lastDoctorEditAt && (
+                  <>
+                    <div>
+                      <div className="text-xs text-slate-400 uppercase font-bold">ექიმის ბოლო ცვლილება</div>
+                      <div className="font-bold text-slate-900">
+                        {request.lastDoctorEditByUserName || '-'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-400 uppercase font-bold">რეგისტრატორის განმეორებითი მოქმედება</div>
+                      <div className={`font-bold ${request.requiresRegistrarAction ? 'text-sky-600' : 'text-slate-500'}`}>
+                        {request.requiresRegistrarAction ? 'ელოდება ხელახლა მოქმედებას' : 'დამუშავებულია'}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
         </div>
 
         <div className="space-y-6">
+          {pendingDoctorEdit && (
+            <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
+              <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-sky-600" />
+                <h3 className="font-bold text-sky-900">ხელახლა დასამუშავებელი ცვლილება</h3>
+              </div>
+              <div className="space-y-4 p-4 sm:p-6">
+                <p className="text-sm leading-6 text-sky-900">
+                  {isRegistrar || isAdmin
+                    ? 'ექიმმა/ექთანმა ჩანაწერი შეცვალა და ახლა ხელახლა მოქმედებას ელოდება.'
+                    : 'თქვენი ცვლილება რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა.'}
+                </p>
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტორი</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingDoctorEdit.editedByUserName}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტირების დრო</div>
+                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingDoctorEdit.editedAt)}</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase text-sky-700">ექიმის კომენტარი</div>
+                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                    {pendingDoctorEdit.comment}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {pendingUpdate && (
             <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
               <div className="border-b border-amber-200 px-6 py-3 flex items-center gap-2">
@@ -602,7 +726,7 @@ export default function RequestDetailsPage() {
             </div>
           )}
 
-          {(isRegistrar || isAdmin) && (
+          {canManageRequest && (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -612,6 +736,12 @@ export default function RequestDetailsPage() {
                 {isRegistrarOnly && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
                     ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.
+                  </div>
+                )}
+
+                {canDoctorEdit && (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+                    ექიმის/ექთნის ცვლილება მაშინვე შეინახება, მაგრამ რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. კომენტარი სავალდებულოა.
                   </div>
                 )}
 
@@ -648,39 +778,58 @@ export default function RequestDetailsPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">რეგისტრატორის სახელი, გვარი</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                      value={formData.registrarName}
-                      onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">ფურცლის შემვსები პირი</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                      value={formData.formFillerName}
-                      onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
-                    />
-                  </div>
-                </div>
+                {!canDoctorEdit && (
+                  <>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700">რეგისტრატორის სახელი, გვარი</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                          value={formData.registrarName}
+                          onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700">ფურცლის შემვსები პირი</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                          value={formData.formFillerName}
+                          onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
+                        />
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">
-                    რეგისტრატორის კომენტარი
-                    {isRegistrarOnly && <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>}
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-                    value={formData.registrarComment}
-                    onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">
+                        რეგისტრატორის კომენტარი
+                        {isRegistrarOnly && <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>}
+                      </label>
+                      <textarea
+                        rows={3}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                        value={formData.registrarComment}
+                        onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {canDoctorEdit && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">
+                      ცვლილების კომენტარი
+                      <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                      value={formData.doctorEditComment}
+                      onChange={(e) => setFormData({ ...formData, doctorEditComment: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <button
                   type="submit"
