@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { resolveUserDisplayName } from '../accessControl';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { getDiagnosisEntries } from '../icd10Utils';
 import { ClinicalRequest } from '../types';
@@ -10,13 +11,13 @@ import { ka } from 'date-fns/locale';
 import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
 
 function getResolvedFormFillerName(request: ClinicalRequest) {
-  const formFillerName = request.formFillerName?.trim();
+  const formFillerName = resolveUserDisplayName(request.formFillerName, request.createdByUserEmail);
 
-  if (formFillerName) {
+  if (formFillerName?.trim()) {
     return formFillerName;
   }
 
-  return request.createdByUserName?.trim() || '';
+  return resolveUserDisplayName(request.createdByUserName, request.createdByUserEmail) || request.createdByUserName?.trim() || '';
 }
 
 export default function PrintPage() {
@@ -187,7 +188,9 @@ export default function PrintPage() {
             <div className="space-y-8">
               <div className="border-t border-slate-900 pt-2">
                 <div className="text-[10px] font-black uppercase text-slate-500">პასუხისმგებელი პირი</div>
-                <div className="text-sm font-bold">{request.createdByUserName}</div>
+                <div className="text-sm font-bold">
+                  {resolveUserDisplayName(request.createdByUserName, request.createdByUserEmail) || request.createdByUserName}
+                </div>
               </div>
             </div>
             <div className="space-y-8">

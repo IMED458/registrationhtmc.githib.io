@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ACCESS_DENIED_MESSAGE, getAllowedUserConfig, normalizeEmail } from './accessControl';
+import { ACCESS_DENIED_MESSAGE, getAllowedUserConfig, normalizeEmail, resolveUserDisplayName } from './accessControl';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { SystemSettings, UserProfile } from './types';
 
@@ -91,10 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let existingProfile: Partial<UserProfile> | null = null;
         const fallbackProfile: UserProfile = {
           uid: firebaseUser.uid,
-          fullName:
-            firebaseUser.displayName ||
-            allowedUser.email.split('@')[0] ||
-            'Clinic User',
+          fullName: resolveUserDisplayName(firebaseUser.displayName || allowedUser.email, allowedUser.email) || 'Clinic User',
           email: allowedUser.email,
           role: allowedUser.role,
           createdAt: new Date().toISOString(),
@@ -107,10 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           const mergedProfile: UserProfile = {
             ...fallbackProfile,
-            fullName:
+            fullName: resolveUserDisplayName(
               firebaseUser.displayName ||
-              existingProfile?.fullName ||
-              fallbackProfile.fullName,
+                existingProfile?.fullName ||
+                fallbackProfile.fullName,
+              allowedUser.email,
+            ) || fallbackProfile.fullName,
             createdAt: existingProfile?.createdAt || fallbackProfile.createdAt,
           };
 
@@ -134,10 +133,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(firebaseUser);
         setProfile({
           ...fallbackProfile,
-          fullName:
+          fullName: resolveUserDisplayName(
             firebaseUser.displayName ||
-            existingProfile?.fullName ||
-            fallbackProfile.fullName,
+              existingProfile?.fullName ||
+              fallbackProfile.fullName,
+            allowedUser.email,
+          ) || fallbackProfile.fullName,
           createdAt: existingProfile?.createdAt || fallbackProfile.createdAt,
         });
       } catch (error) {

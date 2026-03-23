@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { resolveUserDisplayName } from '../accessControl';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
@@ -134,13 +135,13 @@ function getDateTimeLabel(value: any) {
 }
 
 function getDefaultFormFillerName(request?: ClinicalRequest | null, fallbackName?: string | null) {
-  const senderName = request?.createdByUserName?.trim();
+  const senderName = resolveUserDisplayName(request?.createdByUserName, request?.createdByUserEmail);
 
-  if (senderName) {
-    return senderName;
+  if (senderName?.trim()) {
+    return senderName.trim();
   }
 
-  return fallbackName?.trim() || '';
+  return resolveUserDisplayName(fallbackName) || fallbackName?.trim() || '';
 }
 
 export default function RequestDetailsPage() {
@@ -1238,7 +1239,9 @@ export default function RequestDetailsPage() {
             <div className="space-y-3">
               <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-slate-500">გამომგზავნი:</span>
-                <span className="font-medium text-slate-700">{request.createdByUserName}</span>
+                <span className="font-medium text-slate-700">
+                  {resolveUserDisplayName(request.createdByUserName, request.createdByUserEmail) || request.createdByUserName}
+                </span>
               </div>
               <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-slate-500">შექმნილია:</span>

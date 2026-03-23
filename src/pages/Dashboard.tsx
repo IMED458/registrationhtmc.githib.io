@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { resolveUserDisplayName } from '../accessControl';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
@@ -61,6 +62,10 @@ function getCreatedAtLabel(request: ClinicalRequest) {
   return request.createdAt?.toDate
     ? format(request.createdAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka })
     : '-';
+}
+
+function getRequestSenderLabel(request: ClinicalRequest) {
+  return resolveUserDisplayName(request.createdByUserName, request.createdByUserEmail) || '-';
 }
 
 function hasDoctorEditPendingApproval(request: ClinicalRequest) {
@@ -440,7 +445,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">გამომგზავნი</div>
-                  <div className="mt-1 text-sm text-slate-700">{req.createdByUserName}</div>
+                  <div className="mt-1 text-sm text-slate-700">{getRequestSenderLabel(req)}</div>
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">თარიღი</div>
@@ -559,7 +564,7 @@ export default function Dashboard() {
                       {req.studyType && <div className="text-xs text-emerald-600 font-bold">{req.studyType}</div>}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-slate-600">{req.createdByUserName}</div>
+                      <div className="text-sm text-slate-600">{getRequestSenderLabel(req)}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">

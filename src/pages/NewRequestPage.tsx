@@ -4,6 +4,7 @@ import { addDoc, collection, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
+import { resolveUserDisplayName } from '../accessControl';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } from '../icd10Lookup';
 import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
@@ -68,7 +69,7 @@ export default function NewRequestPage() {
   const canCreateRequests = isAdmin || isDoctorOrNurse;
   const icdLookupRequestRef = useRef(0);
   const requiresStructuredFields = patientLookupSource === 'sheet';
-  const automaticSenderName = profile?.fullName?.trim() || profile?.email?.split('@')[0] || 'ემერჯენსი';
+  const automaticSenderName = resolveUserDisplayName(profile?.fullName, profile?.email) || 'ემერჯენსი';
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
