@@ -1,156 +1,118 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
     function userEmail() {
-      return isAuthenticated() && request.auth.token.email != null
+      return isSignedIn() && request.auth.token.email != null
         ? request.auth.token.email
         : "";
     }
 
-    function isVerifiedEmail() {
-      return isAuthenticated() && request.auth.token.email_verified == true;
+    function isVerifiedGoogleUser() {
+      return isSignedIn() &&
+        request.auth.token.email_verified == true;
     }
 
-    function isPasswordProvider() {
-      return isAuthenticated() &&
+    function isPasswordUser() {
+      return isSignedIn() &&
         request.auth.token.firebase != null &&
         request.auth.token.firebase.sign_in_provider == "password";
     }
 
-    function emailRole() {
-      return userEmail() == "imedashviligio27@gmail.com" ? "admin" :
-        userEmail() == "eringorokva@gmail.com" ? "doctor" :
-        userEmail() == "emergencyhtmc14@gmail.com" ? "registrar" :
-        "";
-    }
-
     function isAllowedProvider() {
-      return isVerifiedEmail() || isPasswordProvider();
-    }
-
-    function hasGlobalSettings() {
-      return exists(/databases/$(database)/documents/settings/global);
-    }
-
-    function globalSettings() {
-      return hasGlobalSettings()
-        ? get(/databases/$(database)/documents/settings/global).data
-        : {};
-    }
-
-    function disabledEmails() {
-      return hasGlobalSettings() && ('disabledEmails' in globalSettings())
-        ? globalSettings().disabledEmails
-        : [];
-    }
-
-    function isAllowedEmailCandidate() {
-      return isAuthenticated() &&
-        userEmail() != "" &&
-        emailRole() != "" &&
-        isAllowedProvider();
-    }
-
-    function isEmailDisabled() {
-      return isAllowedEmailCandidate() && userEmail() in disabledEmails();
-    }
-
-    function isAllowedEmail() {
-      return isAllowedEmailCandidate() && !isEmailDisabled();
-    }
-
-    function hasUserProfile() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function getUserRole() {
-      return emailRole() != ""
-        ? emailRole()
-        : (
-            hasUserProfile()
-              ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-              : ""
-          );
-    }
-
-    function hasRole(role) {
-      return isAllowedEmail() && getUserRole() == role;
+      return isVerifiedGoogleUser() || isPasswordUser();
     }
 
     function isAdmin() {
-      return hasRole('admin');
+      return isAllowedProvider() &&
+        userEmail() == "imedashviligio27@gmail.com";
+    }
+
+    function isDoctor() {
+      return isAllowedProvider() &&
+        userEmail() == "eringorokva@gmail.com";
     }
 
     function isRegistrar() {
-      return hasRole('registrar');
+      return isAllowedProvider() &&
+        userEmail() == "emergencyhtmc14@gmail.com";
     }
 
-    function isDoctorOrNurse() {
-      return hasRole('doctor') || hasRole('nurse');
+    function isAllowedUser() {
+      return isAdmin() || isDoctor() || isRegistrar();
     }
 
-    function requestBelongsToCurrentUser(requestData) {
-      return isAuthenticated() && (
-        requestData.createdByUserId == request.auth.uid ||
-        requestData.createdByUserEmail == userEmail()
+    function isOwner() {
+      return isSignedIn() && (
+        resource.data.createdByUserId == request.auth.uid ||
+        resource.data.createdByUserEmail == userEmail()
       );
     }
 
-    function isRequestOwner() {
-      return requestBelongsToCurrentUser(resource.data);
-    }
-
-    function newRequestBelongsToCurrentUser() {
-      return isAuthenticated() &&
+    function isNewOwner() {
+      return isSignedIn() &&
         request.resource.data.createdByUserId == request.auth.uid &&
         request.resource.data.createdByUserEmail == userEmail();
     }
 
-    function ownUserProfileMatchesAllowedRole(userId) {
-      return request.auth.uid == userId &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.email == userEmail() &&
-        request.resource.data.role == emailRole();
+    function ownRole() {
+      return isAdmin() ? "admin" :
+        isDoctor() ? "doctor" :
+        isRegistrar() ? "registrar" :
+        "";
     }
 
     match /users/{userId} {
-      allow read: if isAllowedEmail() && (isAdmin() || request.auth.uid == userId);
-      allow create: if isAllowedEmail() && ownUserProfileMatchesAllowedRole(userId);
-      allow update: if isAllowedEmail() && (isAdmin() || ownUserProfileMatchesAllowedRole(userId));
+      allow read: if isAllowedUser() &&
+        (isAdmin() || request.auth.uid == userId);
+
+      allow create: if isAllowedUser() &&
+        request.auth.uid == userId &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.email == userEmail() &&
+        request.resource.data.role == ownRole();
+
+      allow update: if isAllowedUser() &&
+        (
+          isAdmin() ||
+          (
+            request.auth.uid == userId &&
+            request.resource.data.uid == request.auth.uid &&
+            request.resource.data.email == userEmail() &&
+            request.resource.data.role == ownRole()
+          )
+        );
     }
 
     match /requests/{requestId} {
-      allow read: if isAllowedEmail() && (
-        isAdmin() ||
-        isRegistrar() ||
-        isRequestOwner()
-      );
+      allow read: if isAllowedUser() &&
+        (isAdmin() || isRegistrar() || isOwner());
 
-      allow create: if isAllowedEmail() &&
-        (isDoctorOrNurse() || isAdmin()) &&
-        newRequestBelongsToCurrentUser();
+      allow create: if isAllowedUser() &&
+        (isAdmin() || isDoctor()) &&
+        isNewOwner();
 
-      allow update: if isAllowedEmail() && (
-        isRegistrar() ||
-        isAdmin() ||
-        (isDoctorOrNurse() && isRequestOwner() && resource.data.currentStatus == 'ახალი')
-      );
+      allow update: if isAllowedUser() &&
+        (
+          isAdmin() ||
+          isRegistrar() ||
+          (isDoctor() && isOwner() && resource.data.currentStatus == "ახალი")
+        );
 
-      allow delete: if isAllowedEmail() && isAdmin();
+      allow delete: if isAllowedUser() && isAdmin();
     }
 
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if isAllowedEmail();
+      allow create: if isAllowedUser();
     }
 
     match /settings/{settingId} {
-      allow read: if isAllowedEmailCandidate();
-      allow write: if isAdmin();
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser() && isAdmin();
     }
   }
 }
