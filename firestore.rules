@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isAuthenticated() &&
+        request.auth.token.email != null &&
+        request.auth.token.email_verified == true;
+    }
+
+    function emailRole() {
+      return request.auth.token.email == "imedashviligio27@gmail.com" ? "admin" :
+        request.auth.token.email == "eringorokva@gmail.com" ? "doctor" :
+        request.auth.token.email == "emergencyhtmc14@gmail.com" ? "registrar" :
+        "";
+    }
+
+    function isAllowedEmail() {
+      return isVerifiedEmail() && emailRole() != "";
+    }
+
+    function hasUserProfile() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserRole() {
+      return hasUserProfile()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : emailRole();
+    }
+
+    function hasRole(role) {
+      return isAllowedEmail() && getUserRole() == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isRegistrar() {
+      return hasRole('registrar');
+    }
+
+    function isDoctorOrNurse() {
+      return hasRole('doctor') || hasRole('nurse');
+    }
+
+    function isRequestOwner() {
+      return isAuthenticated() && resource.data.createdByUserId == request.auth.uid;
+    }
+
+    function ownUserProfileMatchesAllowedRole(userId) {
+      return request.auth.uid == userId &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.role == emailRole();
+    }
+
+    match /users/{userId} {
+      allow read: if isAllowedEmail() && (isAdmin() || request.auth.uid == userId);
+      allow create: if isAllowedEmail() && ownUserProfileMatchesAllowedRole(userId);
+      allow update: if isAllowedEmail() && (isAdmin() || ownUserProfileMatchesAllowedRole(userId));
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAllowedEmail() && (
+        isAdmin() ||
+        isRegistrar() ||
+        isRequestOwner()
+      );
+      allow create: if isAllowedEmail() && (isDoctorOrNurse() || isAdmin());
+      allow update: if isAllowedEmail() && (
+        isRegistrar() ||
+        isAdmin() ||
+        (isDoctorOrNurse() && isRequestOwner() && resource.data.currentStatus == 'ახალი')
+      );
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAllowedEmail();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAllowedEmail();
+      allow write: if isAdmin();
+    }
+  }
+}

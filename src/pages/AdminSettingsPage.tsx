@@ -1,0 +1,174 @@
+import { useEffect, useState } from 'react';
+import { addDoc, collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../AuthContext';
+import { SystemSettings, AuditLog } from '../types';
+import { CheckCircle2, Database, History, Loader2, Save } from 'lucide-react';
+import { format } from 'date-fns';
+import { ka } from 'date-fns/locale';
+
+export default function AdminSettingsPage() {
+  const { isAdmin, profile } = useAuth();
+  const [settings, setSettings] = useState<SystemSettings>({
+    googleSheetsId: '',
+    googleDriveFolderId: '',
+    sheetName: 'Sheet1',
+    columnMapping: {
+      firstName: 'First Name',
+      lastName: 'Last Name',
+      historyNumber: 'History Number',
+      personalId: 'Personal ID',
+      birthDate: 'Birth Date',
+      phone: 'Phone',
+      address: 'Address'
+    }
+  });
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const fetchSettings = async () => {
+      const docSnap = await getDoc(doc(db, 'settings', 'global'));
+      if (docSnap.exists()) {
+        setSettings(docSnap.data() as SystemSettings);
+      }
+    };
+
+    const q = query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog)));
+    });
+
+    fetchSettings();
+    return unsubscribe;
+  }, [isAdmin]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'global'), settings);
+
+      if (profile) {
+        await addDoc(collection(db, 'audit_logs'), {
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: 'settings/global',
+          actionType: 'SETTINGS_UPDATE',
+          newValue: 'ადმინისტრატორმა განაახლა სისტემის პარამეტრები',
+          createdAt: Timestamp.now(),
+        });
+      }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("შენახვა ვერ მოხერხდა");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isAdmin) return <div className="text-center p-12 text-red-500 font-bold">წვდომა აკრძალულია</div>;
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">ადმინისტრირება</h2>
+        <p className="text-slate-500">სისტემის პარამეტრები და აუდიტი</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Google Integration Settings */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+              <Database className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-bold text-slate-700">Google Drive / Sheets ინტეგრაცია</h3>
+            </div>
+            <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Google Sheets ID</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  value={settings.googleSheetsId}
+                  onChange={(e) => setSettings({ ...settings, googleSheetsId: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Sheet-ის სახელი</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  value={settings.sheetName}
+                  onChange={(e) => setSettings({ ...settings, sheetName: e.target.value })}
+                />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <h4 className="text-xs font-black uppercase text-slate-400 mb-4">სვეტების Mapping (Excel/Sheets)</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  {Object.keys(settings.columnMapping).map((key) => (
+                    <div key={key} className="flex items-center gap-4">
+                      <span className="text-sm text-slate-600 w-32 flex-shrink-0">{key}</span>
+                      <input
+                        type="text"
+                        className="flex-1 px-4 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                        value={(settings.columnMapping as any)[key]}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          columnMapping: { ...settings.columnMapping, [key]: e.target.value }
+                        })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : success ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+                {success ? 'შენახულია' : 'პარამეტრების შენახვა'}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Audit Logs */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col max-h-[700px]">
+          <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+            <History className="w-5 h-5 text-emerald-600" />
+            <h3 className="font-bold text-slate-700">Audit Log (ბოლო 50 მოქმედება)</h3>
+          </div>
+          <div className="flex-1 overflow-auto p-4 space-y-3">
+            {logs.map((log) => (
+              <div key={log.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
+                <div className="flex justify-between font-bold text-slate-700">
+                  <span>{log.userName}</span>
+                  <span className="text-slate-400">
+                    {log.createdAt?.toDate ? format(log.createdAt.toDate(), 'dd.MM HH:mm', { locale: ka }) : '-'}
+                  </span>
+                </div>
+                <div className="text-slate-600">
+                  <span className="font-bold text-emerald-600">{log.actionType}:</span> {log.newValue}
+                </div>
+                {log.oldValue && (
+                  <div className="text-slate-400 italic">ძველი: {log.oldValue}</div>
+                )}
+              </div>
+            ))}
+            {logs.length === 0 && <div className="text-center py-12 text-slate-400">ლოგები არ არის</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
