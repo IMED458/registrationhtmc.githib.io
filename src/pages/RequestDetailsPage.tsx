@@ -10,7 +10,7 @@ import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode 
 import { getStudyTypes } from '../studyTypeUtils';
 import { ClinicalRequest, DiagnosisEntry, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Plus, Printer, Save, Trash2, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Pencil, Plus, Printer, Save, Trash2, User, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 
@@ -18,6 +18,23 @@ type ConfirmAction = 'save' | 'approve' | null;
 
 type DiagnosisFormRow = DiagnosisEntry & {
   id: string;
+};
+
+type RequestEditFormState = {
+  firstName: string;
+  lastName: string;
+  historyNumber: string;
+  personalId: string;
+  birthDate: string;
+  phone: string;
+  address: string;
+  diagnoses: DiagnosisFormRow[];
+  currentStatus: string;
+  finalDecision: string;
+  registrarComment: string;
+  registrarName: string;
+  formFillerName: string;
+  doctorEditComment: string;
 };
 
 function createDiagnosisRowId() {
@@ -145,6 +162,36 @@ function getDefaultFormFillerName(request?: ClinicalRequest | null, fallbackName
   return resolveUserDisplayName(fallbackName) || fallbackName?.trim() || '';
 }
 
+function buildFormDataFromRequest(
+  data?: ClinicalRequest | null,
+  profileFullName?: string | null,
+): RequestEditFormState {
+  const diagnosisRows = data
+    ? getDiagnosisEntries(data).map((entry) => createDiagnosisFormRow({
+      icdCode: entry.icdCode || entry.code,
+      diagnosis: entry.diagnosis || entry.description,
+      isPrimary: entry.isExplicitlyPrimary || entry.isPrimary,
+    }))
+    : [];
+
+  return {
+    firstName: data?.patientData.firstName || '',
+    lastName: data?.patientData.lastName || '',
+    historyNumber: data?.patientData.historyNumber || '',
+    personalId: data?.patientData.personalId || '',
+    birthDate: data?.patientData.birthDate || '',
+    phone: data?.patientData.phone || '',
+    address: data?.patientData.address || '',
+    diagnoses: diagnosisRows.length ? diagnosisRows : [createDiagnosisFormRow({ isPrimary: true })],
+    currentStatus: data?.currentStatus || '',
+    finalDecision: data?.finalDecision || '',
+    registrarComment: data?.registrarComment || '',
+    registrarName: data?.registrarName || profileFullName || '',
+    formFillerName: data?.formFillerName || getDefaultFormFillerName(data, profileFullName) || '',
+    doctorEditComment: data?.lastDoctorEditComment || '',
+  };
+}
+
 export default function RequestDetailsPage() {
   const { id } = useParams();
   const { profile, isRegistrar, isAdmin, isDoctorOrNurse } = useAuth();
@@ -152,6 +199,7 @@ export default function RequestDetailsPage() {
   const [request, setRequest] = useState<ClinicalRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [successDialogContent, setSuccessDialogContent] = useState<{
     title: string;
@@ -161,22 +209,7 @@ export default function RequestDetailsPage() {
   const [formError, setFormError] = useState('');
   const autoStatusSyncRef = useRef(false);
 
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    historyNumber: '',
-    personalId: '',
-    birthDate: '',
-    phone: '',
-    address: '',
-    diagnoses: [createDiagnosisFormRow({ isPrimary: true })],
-    currentStatus: '',
-    finalDecision: '',
-    registrarComment: '',
-    registrarName: '',
-    formFillerName: '',
-    doctorEditComment: '',
-  });
+  const [formData, setFormData] = useState<RequestEditFormState>(() => buildFormDataFromRequest(null));
 
   const isRegistrarOnly = isRegistrar && !isAdmin;
   const isRequestOwner =
@@ -265,30 +298,8 @@ export default function RequestDetailsPage() {
           return nextRequest;
         });
 
-        if (!updating && !confirmAction) {
-          const diagnosisRows = getDiagnosisEntries(data).map((entry) => createDiagnosisFormRow({
-            icdCode: entry.icdCode || entry.code,
-            diagnosis: entry.diagnosis || entry.description,
-            isPrimary: entry.isExplicitlyPrimary || entry.isPrimary,
-          }));
-
-          setFormData((current) => ({
-            ...current,
-            firstName: data.patientData.firstName || '',
-            lastName: data.patientData.lastName || '',
-            historyNumber: data.patientData.historyNumber || '',
-            personalId: data.patientData.personalId || '',
-            birthDate: data.patientData.birthDate || '',
-            phone: data.patientData.phone || '',
-            address: data.patientData.address || '',
-            diagnoses: diagnosisRows.length ? diagnosisRows : [createDiagnosisFormRow({ isPrimary: true })],
-            currentStatus: data.currentStatus,
-            finalDecision: data.finalDecision || '',
-            registrarComment: data.registrarComment || '',
-            registrarName: data.registrarName || profile?.fullName || '',
-            formFillerName: data.formFillerName || getDefaultFormFillerName(data, profile?.fullName) || '',
-            doctorEditComment: data.lastDoctorEditComment || '',
-          }));
+        if (!updating && !confirmAction && !isEditing) {
+          setFormData(buildFormDataFromRequest(data, profile?.fullName));
         }
 
         setLoading(false);
@@ -300,7 +311,7 @@ export default function RequestDetailsPage() {
     );
 
     return unsubscribe;
-  }, [confirmAction, id, profile?.fullName, updating]);
+  }, [confirmAction, id, isEditing, profile?.fullName, updating]);
 
   useEffect(() => {
     if (!profile || (!isRegistrar && !isAdmin)) {
@@ -439,6 +450,20 @@ export default function RequestDetailsPage() {
     setConfirmAction('save');
   };
 
+  const handleStartEditing = () => {
+    setFormError('');
+    setSyncNoticeMessage('');
+    setFormData(buildFormDataFromRequest(request, profile?.fullName));
+    setIsEditing(true);
+  };
+
+  const handleCancelEditing = () => {
+    setFormError('');
+    setConfirmAction(null);
+    setFormData(buildFormDataFromRequest(request, profile?.fullName));
+    setIsEditing(false);
+  };
+
   const handleApprovePendingUpdate = () => {
     if (!pendingUpdate && !pendingDoctorEdit) {
       return;
@@ -541,6 +566,7 @@ export default function RequestDetailsPage() {
         });
 
         setConfirmAction(null);
+        setIsEditing(false);
         setSuccessDialogContent({
           title: 'ცვლილება შენახულია',
           message: 'ჩანაწერი დარედაქტირდა და ადმინისტრატორთან შეტყობინება ავტომატურად გაიგზავნა.',
@@ -596,6 +622,7 @@ export default function RequestDetailsPage() {
         });
 
         setConfirmAction(null);
+        setIsEditing(false);
         setSuccessDialogContent({
           title: 'ცვლილება შენახულია',
           message: 'პაციენტის მონაცემები და დიაგნოზი განახლდა, ცვლილება მონიშნულია რედაქტირებულად და ადმინისტრატორთან შეტყობინება გაიგზავნა.',
@@ -627,6 +654,7 @@ export default function RequestDetailsPage() {
       });
 
       setConfirmAction(null);
+      setIsEditing(false);
       setSuccessDialogContent({
         title: 'სტატუსი განახლდა წარმატებით',
         message: 'ცვლილება შენახულია და მთავარ პანელზეც გამოჩნდება.',
@@ -698,13 +726,36 @@ export default function RequestDetailsPage() {
           </button>
           <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნის დეტალები</h2>
         </div>
-        <button
-          onClick={() => navigate(`/print/${id}`)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-bold text-white transition-all shadow-lg shadow-blue-100 hover:bg-blue-700 sm:w-auto sm:py-2"
-        >
-          <Printer className="w-5 h-5" />
-          ბეჭდვა
-        </button>
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          {canManageRequest && (
+            isEditing ? (
+              <button
+                type="button"
+                onClick={handleCancelEditing}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto sm:py-2"
+              >
+                <X className="w-5 h-5" />
+                გაუქმება
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartEditing}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-bold text-emerald-700 transition hover:bg-emerald-100 sm:w-auto sm:py-2"
+              >
+                <Pencil className="w-5 h-5" />
+                რედაქტირება
+              </button>
+            )
+          )}
+          <button
+            onClick={() => navigate(`/print/${id}`)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-bold text-white transition-all shadow-lg shadow-blue-100 hover:bg-blue-700 sm:w-auto sm:py-2"
+          >
+            <Printer className="w-5 h-5" />
+            ბეჭდვა
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -864,109 +915,17 @@ export default function RequestDetailsPage() {
               </div>
             </div>
           )}
-        </div>
 
-        <div className="space-y-6">
-          {pendingDoctorEdit && (
-            <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
-              <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-sky-900">ექიმის რედაქტირება</h3>
-              </div>
-              <div className="space-y-4 p-4 sm:p-6">
-                <p className="text-sm leading-6 text-sky-900">
-                  {isRegistrar || isAdmin
-                    ? 'ექიმმა/ექთანმა პაციენტის მონაცემები ან დიაგნოზები შეცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
-                    : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'}
-                </p>
-                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-                  <div>
-                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტორი</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingDoctorEdit.editedByUserName}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტირების დრო</div>
-                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingDoctorEdit.editedAt)}</div>
-                  </div>
+          {canManageRequest && isEditing && (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-bold text-slate-700">რედაქტირება</h3>
                 </div>
-                <div>
-                  <div className="text-xs font-bold uppercase text-sky-700">ექიმის კომენტარი</div>
-                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
-                    {pendingDoctorEdit.comment}
-                  </div>
-                </div>
-                {isAdmin && request.adminConfirmationStatus === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={handleApprovePendingUpdate}
-                    disabled={updating}
-                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    დადასტურება
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {pendingUpdate && (
-            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
-              <div className="border-b border-amber-200 px-6 py-3 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-amber-900">ადმინისტრატორის შეტყობინება</h3>
-              </div>
-              <div className="space-y-4 p-4 sm:p-6">
-                <p className="text-sm leading-6 text-amber-900">
-                  {isAdmin
-                    ? 'რეგისტრატორმა უკვე შეცვალა ჩანაწერი. აქედან ან ადმინისტრირების გვერდიდან შეგიძლიათ დადასტურება.'
-                    : 'თქვენი ცვლილება უკვე ჩაიწერა. ადმინისტრატორს დადასტურების შეტყობინება გაეგზავნა.'}
-                </p>
-
-                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">ახალი სტატუსი</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.currentStatus}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">საბოლოო გადაწყვეტილება</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.finalDecision || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტორი</div>
-                    <div className="mt-1 text-slate-700">{pendingUpdate.requestedByUserName}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტირების დრო</div>
-                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingUpdate.requestedAt)}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs font-bold uppercase text-amber-700">სავალდებულო კომენტარი</div>
-                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
-                    {pendingUpdate.registrarComment || '-'}
-                  </div>
-                </div>
-
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={handleApprovePendingUpdate}
-                    disabled={updating}
-                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    დადასტურება
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {canManageRequest && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24">
-              <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-bold text-slate-700">{canDoctorEdit ? 'მონაცემების რედაქტირება' : 'სტატუსის მართვა'}</h3>
+                <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {canDoctorEdit ? 'პაციენტი და დიაგნოზი' : 'მოთხოვნის მართვა'}
+                </span>
               </div>
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
                 {isRegistrarOnly && (
@@ -1242,15 +1201,121 @@ export default function RequestDetailsPage() {
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={updating || (canDoctorEdit && !formData.doctorEditComment.trim())}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                  შენახვა
-                </button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={handleCancelEditing}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                  >
+                    გაუქმება
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updating || (canDoctorEdit && !formData.doctorEditComment.trim())}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50 sm:w-auto sm:px-6"
+                  >
+                    {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    შენახვა
+                  </button>
+                </div>
               </form>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          {pendingDoctorEdit && (
+            <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
+              <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-sky-600" />
+                <h3 className="font-bold text-sky-900">ექიმის რედაქტირება</h3>
+              </div>
+              <div className="space-y-4 p-4 sm:p-6">
+                <p className="text-sm leading-6 text-sky-900">
+                  {isRegistrar || isAdmin
+                    ? 'ექიმმა/ექთანმა პაციენტის მონაცემები ან დიაგნოზები შეცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
+                    : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'}
+                </p>
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტორი</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingDoctorEdit.editedByUserName}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტირების დრო</div>
+                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingDoctorEdit.editedAt)}</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase text-sky-700">ექიმის კომენტარი</div>
+                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                    {pendingDoctorEdit.comment}
+                  </div>
+                </div>
+                {isAdmin && request.adminConfirmationStatus === 'pending' && (
+                  <button
+                    type="button"
+                    onClick={handleApprovePendingUpdate}
+                    disabled={updating}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    დადასტურება
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {pendingUpdate && (
+            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
+              <div className="border-b border-amber-200 px-6 py-3 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-amber-900">ადმინისტრატორის შეტყობინება</h3>
+              </div>
+              <div className="space-y-4 p-4 sm:p-6">
+                <p className="text-sm leading-6 text-amber-900">
+                  {isAdmin
+                    ? 'რეგისტრატორმა უკვე შეცვალა ჩანაწერი. აქედან ან ადმინისტრირების გვერდიდან შეგიძლიათ დადასტურება.'
+                    : 'თქვენი ცვლილება უკვე ჩაიწერა. ადმინისტრატორს დადასტურების შეტყობინება გაეგზავნა.'}
+                </p>
+
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">ახალი სტატუსი</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.currentStatus}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">საბოლოო გადაწყვეტილება</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.finalDecision || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტორი</div>
+                    <div className="mt-1 text-slate-700">{pendingUpdate.requestedByUserName}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტირების დრო</div>
+                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingUpdate.requestedAt)}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold uppercase text-amber-700">სავალდებულო კომენტარი</div>
+                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                    {pendingUpdate.registrarComment || '-'}
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={handleApprovePendingUpdate}
+                    disabled={updating}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    დადასტურება
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
