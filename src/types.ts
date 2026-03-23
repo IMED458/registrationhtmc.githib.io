@@ -18,7 +18,7 @@ export interface Patient {
   address?: string;
 }
 
-export type RequestStatus = 'ახალი' | 'განხილვაშია' | 'დადასტურებულია' | 'დასრულებულია' | 'უარყოფილია';
+export type RequestStatus = 'ახალი' | 'განხილვაშია' | 'მიღებულია' | 'დადასტურებულია' | 'დასრულებულია' | 'უარყოფილია';
 export type AdminConfirmationStatus = 'pending' | 'confirmed';
 
 export interface DiagnosisEntry {

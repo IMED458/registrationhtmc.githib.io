@@ -66,6 +66,7 @@ export const DEPARTMENTS = [
 export const REQUEST_STATUSES = [
   "ახალი",
   "განხილვაშია",
+  "მიღებულია",
   "დადასტურებულია",
   "დასრულებულია",
   "უარყოფილია"
