@@ -216,10 +216,6 @@ export default function RequestDetailsPage() {
   const [updating, setUpdating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const [successDialogContent, setSuccessDialogContent] = useState<{
-    title: string;
-    message: string;
-  } | null>(null);
   const [syncNoticeMessage, setSyncNoticeMessage] = useState('');
   const [formError, setFormError] = useState('');
   const autoStatusSyncRef = useRef(false);
@@ -240,6 +236,7 @@ export default function RequestDetailsPage() {
     ? request?.pendingRegistrarUpdate || null
     : null;
   const pendingDoctorEdit = request?.pendingDoctorEdit || null;
+  const navigateToDashboard = () => navigate('/', { replace: true });
 
   useEffect(() => {
     if (!id || !profile || !request || !isRegistrarOnly) {
@@ -537,12 +534,7 @@ export default function RequestDetailsPage() {
         });
 
         setConfirmAction(null);
-        setSuccessDialogContent({
-          title: 'რედაქტირება დადასტურდა',
-          message: confirmingDoctorEdit
-            ? 'ექიმის ცვლილება უკვე დადასტურებულია ადმინისტრატორის მიერ.'
-            : 'რეგისტრატორის ცვლილება უკვე დადასტურებულია ადმინისტრატორის მიერ.',
-        });
+        navigateToDashboard();
         return;
       }
 
@@ -596,10 +588,7 @@ export default function RequestDetailsPage() {
 
         setConfirmAction(null);
         setIsEditing(false);
-        setSuccessDialogContent({
-          title: 'ცვლილება შენახულია',
-          message: 'ჩანაწერი დარედაქტირდა და ადმინისტრატორთან შეტყობინება ავტომატურად გაიგზავნა.',
-        });
+        navigateToDashboard();
         return;
       }
 
@@ -652,10 +641,7 @@ export default function RequestDetailsPage() {
 
         setConfirmAction(null);
         setIsEditing(false);
-        setSuccessDialogContent({
-          title: 'ცვლილება შენახულია',
-          message: 'პაციენტის მონაცემები და დიაგნოზი განახლდა, ცვლილება მონიშნულია რედაქტირებულად და ადმინისტრატორთან შეტყობინება გაიგზავნა.',
-        });
+        navigateToDashboard();
         return;
       }
 
@@ -712,10 +698,7 @@ export default function RequestDetailsPage() {
 
         setConfirmAction(null);
         setIsEditing(false);
-        setSuccessDialogContent({
-          title: 'მონაცემები განახლდა',
-          message: 'ადმინისტრატორმა ცვლილებები სრულად შეინახა.',
-        });
+        navigateToDashboard();
         return;
       }
 
@@ -744,10 +727,7 @@ export default function RequestDetailsPage() {
 
       setConfirmAction(null);
       setIsEditing(false);
-      setSuccessDialogContent({
-        title: 'სტატუსი განახლდა წარმატებით',
-        message: 'ცვლილება შენახულია და მთავარ პანელზეც გამოჩნდება.',
-      });
+      navigateToDashboard();
     } catch (err) {
       console.error('Update error:', err);
 
@@ -1852,32 +1832,6 @@ export default function RequestDetailsPage() {
         </div>
       )}
 
-      {successDialogContent && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-900">{successDialogContent.title}</h3>
-              <p className="text-sm text-slate-600">{successDialogContent.message}</p>
-            </div>
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setSuccessDialogContent(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setSuccessDialogContent(null)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

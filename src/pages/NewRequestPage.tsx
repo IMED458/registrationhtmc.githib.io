@@ -103,6 +103,7 @@ export default function NewRequestPage() {
   const resolvedSenderName = formData.senderName.trim() || automaticSenderName;
   const hasMultipleDiagnoses = formData.diagnoses.length > 1;
   const hasExplicitPrimaryDiagnosis = formData.diagnoses.some((row) => row.isPrimary);
+  const navigateToDashboard = () => navigate('/', { replace: true });
 
   const filteredDepts = DEPARTMENTS.filter(d => 
     d.toLowerCase().includes(deptSearch.toLowerCase())
@@ -523,7 +524,7 @@ export default function NewRequestPage() {
         }
       }
 
-      navigate('/');
+      navigateToDashboard();
     } catch (err) {
       console.error("Submit error:", err);
       setError(
@@ -558,7 +559,7 @@ export default function NewRequestPage() {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={navigateToDashboard}
             className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold"
           >
             მთავარ გვერდზე დაბრუნება
