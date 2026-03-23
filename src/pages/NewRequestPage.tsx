@@ -34,7 +34,7 @@ export default function NewRequestPage() {
     requestedAction: REQUEST_ACTIONS[0],
     department: '',
     studyType: '',
-    consentStatus: CONSENT_STATUSES[0],
+    consentStatus: '',
     doctorComment: ''
   });
 
@@ -417,7 +417,24 @@ export default function NewRequestPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">პაციენტის თანხმობა / უარი</label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <label className="text-sm font-bold text-slate-700">
+                  პაციენტის თანხმობა / უარი
+                  <span className="ml-2 text-xs font-medium text-slate-400">(არასავალდებულო)</span>
+                </label>
+                {formData.consentStatus && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, consentStatus: '' })}
+                    className="text-sm font-bold text-slate-500 hover:text-slate-700"
+                  >
+                    მონიშვნის გასუფთავება
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-400">
+                მიუთითეთ მხოლოდ საჭიროების შემთხვევაში, ძირითადად უარის შემთხვევებში.
+              </p>
               <div className="flex flex-wrap gap-3">
                 {CONSENT_STATUSES.map(status => (
                   <label 

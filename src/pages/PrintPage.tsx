@@ -94,8 +94,8 @@ export default function PrintPage() {
               </div>
               <div>
                 <div className="text-[10px] font-black uppercase text-slate-500">თანხმობის სტატუსი</div>
-                <div className={`text-lg font-bold border-b border-slate-300 pb-1 ${request.consentStatus.startsWith('უარი') ? 'text-red-600' : ''}`}>
-                  {request.consentStatus}
+                <div className={`text-lg font-bold border-b border-slate-300 pb-1 ${request.consentStatus?.startsWith('უარი') ? 'text-red-600' : ''}`}>
+                  {request.consentStatus || '-'}
                 </div>
               </div>
             </div>

@@ -18,6 +18,8 @@ export default function RequestDetailsPage() {
   const [request, setRequest] = useState<ClinicalRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   
   const [formData, setFormData] = useState({
     currentStatus: '',
@@ -68,10 +70,29 @@ export default function RequestDetailsPage() {
     }));
   }, [isAdmin, isRegistrar, profile]);
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const statusOptions = Array.from(
+    new Set([
+      ...REQUEST_STATUSES.filter((status) => status !== 'უარყოფილია'),
+      ...(formData.currentStatus ? [formData.currentStatus] : []),
+    ]),
+  );
+
+  const finalDecisionOptions = Array.from(
+    new Set([
+      ...FINAL_DECISIONS.filter((decision) => decision !== 'გაუქმებულია'),
+      ...(formData.finalDecision ? [formData.finalDecision] : []),
+    ]),
+  );
+
+  const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !profile || !request) return;
-    
+    setShowUpdateConfirm(true);
+  };
+
+  const submitUpdate = async () => {
+    if (!id || !profile || !request) return;
+
     setUpdating(true);
     try {
       const updateData = {
@@ -95,7 +116,8 @@ export default function RequestDetailsPage() {
       });
 
       setRequest({ ...request, ...updateData });
-      alert("სტატუსი განახლდა წარმატებით");
+      setShowUpdateConfirm(false);
+      setShowSuccessDialog(true);
     } catch (err) {
       console.error("Update error:", err);
       alert(
@@ -190,8 +212,8 @@ export default function RequestDetailsPage() {
               </div>
               <div>
                 <div className="text-xs text-slate-400 uppercase font-bold">პაციენტის თანხმობა / უარი</div>
-                <div className={`font-black text-lg mt-1 ${request.consentStatus.startsWith('უარი') ? 'text-red-600' : 'text-emerald-600'}`}>
-                  {request.consentStatus}
+                <div className={`font-black text-lg mt-1 ${request.consentStatus?.startsWith('უარი') ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {request.consentStatus || '-'}
                 </div>
               </div>
               {request.doctorComment && (
@@ -240,7 +262,7 @@ export default function RequestDetailsPage() {
                     value={formData.currentStatus}
                     onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
                   >
-                    {REQUEST_STATUSES.map(status => (
+                    {statusOptions.map(status => (
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
@@ -254,7 +276,7 @@ export default function RequestDetailsPage() {
                     onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
                   >
                     <option value="">აირჩიეთ...</option>
-                    {FINAL_DECISIONS.map(decision => (
+                    {finalDecisionOptions.map(decision => (
                       <option key={decision} value={decision}>{decision}</option>
                     ))}
                   </select>
@@ -332,6 +354,65 @@ export default function RequestDetailsPage() {
           </div>
         </div>
       </div>
+
+      {showUpdateConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">სტატუსის დადასტურება</h3>
+              <p className="text-sm text-slate-600">
+                ნამდვილად გსურთ სტატუსის განახლება?
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowUpdateConfirm(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitUpdate}
+                disabled={updating}
+                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {updating ? 'ინახება...' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSuccessDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">სტატუსი განახლდა წარმატებით</h3>
+              <p className="text-sm text-slate-600">
+                ცვლილება შენახულია და მთავარ პანელზეც გამოჩნდება.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSuccessDialog(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSuccessDialog(false)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
