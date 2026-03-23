@@ -140,9 +140,6 @@ export default function Dashboard() {
   const [deletingRequestId, setDeletingRequestId] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
-  const pendingApprovals = requests.filter(
-    (request) => request.adminConfirmationStatus === 'pending' && Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit),
-  );
 
   useEffect(() => {
     if (!profile) {
@@ -313,44 +310,6 @@ export default function Dashboard() {
       {feedbackMessage && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {feedbackMessage}
-        </div>
-      )}
-
-      {isAdmin && pendingApprovals.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-black text-amber-900">
-                ადმინის დადასტურებას ელოდება {pendingApprovals.length} ცვლილება
-              </div>
-              <p className="mt-1 text-sm text-amber-800">
-                აქ ჩანს როგორც რეგისტრატორის, ისე ექიმის მიერ დარედაქტირებული ჩანაწერები და ადმინისტრირების გვერდიდანაც შეგიძლიათ მათი დადასტურება.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {pendingApprovals.slice(0, 4).map((request) => (
-              <button
-                key={`pending-${request.id}`}
-                type="button"
-                onClick={() => navigate(`/request/${request.id}`)}
-                className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-left transition hover:bg-amber-100/40"
-              >
-                <div className="text-sm font-bold text-slate-900">
-                  {request.patientData.firstName} {request.patientData.lastName}
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  {request.pendingRegistrarUpdate?.requestedByUserName || request.pendingDoctorEdit?.editedByUserName || 'თანამშრომელი'}-მა შეცვალა ჩანაწერი:
-                </div>
-                <div className="mt-2 text-sm font-bold text-amber-800">
-                  {request.pendingRegistrarUpdate
-                    ? `${request.pendingRegistrarUpdate.currentStatus}${request.pendingRegistrarUpdate.finalDecision ? ` / ${request.pendingRegistrarUpdate.finalDecision}` : ''}`
-                    : 'პაციენტის მონაცემები / დიაგნოზები დარედაქტირდა'}
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
       )}
 

@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { getRoleLabel } from '../accessControl';
 import { useAuth } from '../AuthContext';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
+import { ClinicalRequest } from '../types';
 
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -17,6 +20,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
   });
+
+  useEffect(() => {
+    if (!isAdmin || !db) {
+      setPendingApprovalCount(0);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      collection(db, 'requests'),
+      (snapshot) => {
+        const count = snapshot.docs.reduce((total, requestDoc) => {
+          const request = requestDoc.data() as ClinicalRequest;
+          const hasPendingApproval =
+            request.adminConfirmationStatus === 'pending' &&
+            Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
+
+          return hasPendingApproval ? total + 1 : total;
+        }, 0);
+
+        setPendingApprovalCount(count);
+      },
+      () => {
+        setPendingApprovalCount(0);
+      },
+    );
+
+    return unsubscribe;
+  }, [isAdmin]);
+
+  const pendingApprovalBadge = pendingApprovalCount > 0
+    ? (
+        <span className="inline-flex min-w-[1.35rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+          {pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}
+        </span>
+      )
+    : null;
 
   const navItemClassName = ({ isActive }: { isActive: boolean }) =>
     `flex items-center rounded-lg px-3 py-2 font-medium transition-colors ${
@@ -150,8 +189,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className={navItemClassName}
                 title="მოთხოვნები"
               >
-                <ClipboardList className="w-5 h-5 text-slate-400" />
-                {!isSidebarCollapsed && 'მოთხოვნები'}
+                <div className="relative">
+                  <ClipboardList className="w-5 h-5 text-slate-400" />
+                  {isSidebarCollapsed && pendingApprovalBadge && (
+                    <span className="absolute -right-2 -top-2">
+                      {pendingApprovalBadge}
+                    </span>
+                  )}
+                </div>
+                {!isSidebarCollapsed && (
+                  <>
+                    <span>მოთხოვნები</span>
+                    <span className="ml-auto">{pendingApprovalBadge}</span>
+                  </>
+                )}
               </NavLink>
             )}
 
@@ -193,7 +244,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {isAdmin ? (
             <NavLink to="/admin-requests" className={mobileNavItemClassName}>
-              <ClipboardList className="h-5 w-5" />
+              <div className="relative">
+                <ClipboardList className="h-5 w-5" />
+                {pendingApprovalBadge && (
+                  <span className="absolute -right-2 -top-2">
+                    {pendingApprovalBadge}
+                  </span>
+                )}
+              </div>
               <span className="text-xs">მოთხოვნები</span>
             </NavLink>
           ) : null}
