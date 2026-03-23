@@ -8,6 +8,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   googleDriveFolderId: '',
   sheetName: 'თებერვალი',
   sheetGid: '',
+  disabledEmails: [],
   columnMapping: {
     firstName: 'C',
     lastName: 'B',

@@ -1,14 +1,27 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
+import { REGISTRAR_EMAIL } from '../accessControl';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { DEFAULT_SYSTEM_SETTINGS } from '../defaultSystemSettings';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { SystemSettings, AuditLog } from '../types';
-import { CheckCircle2, Database, History, Loader2, Save } from 'lucide-react';
+import { CheckCircle2, Database, History, Loader2, Save, ShieldOff, Trash2, Undo2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
+
+function mergeSystemSettings(input?: Partial<SystemSettings> | null): SystemSettings {
+  return {
+    ...DEFAULT_SYSTEM_SETTINGS,
+    ...input,
+    disabledEmails: input?.disabledEmails ?? DEFAULT_SYSTEM_SETTINGS.disabledEmails,
+    columnMapping: {
+      ...DEFAULT_SYSTEM_SETTINGS.columnMapping,
+      ...(input?.columnMapping ?? {}),
+    },
+  };
+}
 
 export default function AdminSettingsPage() {
   const { isAdmin, profile } = useAuth();
@@ -16,6 +29,8 @@ export default function AdminSettingsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [registrarSaving, setRegistrarSaving] = useState(false);
+  const isRegistrarDeleted = (settings.disabledEmails ?? []).includes(REGISTRAR_EMAIL);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -23,7 +38,7 @@ export default function AdminSettingsPage() {
     const fetchSettings = async () => {
       const docSnap = await getDoc(doc(db, 'settings', 'global'));
       if (docSnap.exists()) {
-        setSettings(docSnap.data() as SystemSettings);
+        setSettings(mergeSystemSettings(docSnap.data() as Partial<SystemSettings>));
       }
     };
 
@@ -65,6 +80,61 @@ export default function AdminSettingsPage() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleRegistrar = async () => {
+    if (!profile) {
+      return;
+    }
+
+    const shouldDelete = !isRegistrarDeleted;
+    const confirmed = window.confirm(
+      shouldDelete
+        ? 'ნამდვილად გსურთ რეგისტრატორის წაშლა? ამის შემდეგ emergencyhtmc14@gmail.com ვეღარ შევა სისტემაში.'
+        : 'ნამდვილად გსურთ რეგისტრატორის აღდგენა?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const disabledEmails = shouldDelete
+      ? Array.from(new Set([...(settings.disabledEmails ?? []), REGISTRAR_EMAIL]))
+      : (settings.disabledEmails ?? []).filter((email) => email !== REGISTRAR_EMAIL);
+
+    const nextSettings = mergeSystemSettings({
+      ...settings,
+      disabledEmails,
+    });
+
+    setRegistrarSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'global'), nextSettings);
+      setSettings(nextSettings);
+
+      await writeAuditLogEntry({
+        userId: profile.uid,
+        userName: profile.fullName,
+        requestId: 'settings/global',
+        actionType: shouldDelete ? 'REGISTRAR_DELETE' : 'REGISTRAR_RESTORE',
+        newValue: shouldDelete
+          ? 'ადმინისტრატორმა გათიშა რეგისტრატორის წვდომა'
+          : 'ადმინისტრატორმა აღადგინა რეგისტრატორის წვდომა',
+      });
+    } catch (err) {
+      console.error(err);
+      alert(
+        getFirebaseActionErrorMessage(err, {
+          fallback: shouldDelete
+            ? 'რეგისტრატორის წაშლა ვერ მოხერხდა.'
+            : 'რეგისტრატორის აღდგენა ვერ მოხერხდა.',
+          permissionDenied:
+            'მომხმარებლის მართვა ვერ მოხერხდა, რადგან ამ ანგარიშისთვის ადმინისტრატორის write წვდომა არ არის ნებადართული.',
+        }),
+      );
+    } finally {
+      setRegistrarSaving(false);
     }
   };
 
@@ -146,6 +216,49 @@ export default function AdminSettingsPage() {
                 {success ? 'შენახულია' : 'პარამეტრების შენახვა'}
               </button>
             </form>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+              <ShieldOff className="w-5 h-5 text-red-600" />
+              <h3 className="font-bold text-slate-700">მომხმარებლების მართვა</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="text-sm font-bold text-slate-900">რეგისტრატორი</div>
+                    <div className="text-sm text-slate-600">{REGISTRAR_EMAIL}</div>
+                    <div className={`text-xs font-bold ${isRegistrarDeleted ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {isRegistrarDeleted ? 'წვდომა წაშლილია' : 'წვდომა აქტიურია'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleRegistrar}
+                    disabled={registrarSaving}
+                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-bold text-white transition disabled:opacity-50 ${
+                      isRegistrarDeleted
+                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                        : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                  >
+                    {registrarSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : isRegistrarDeleted ? (
+                      <Undo2 className="w-4 h-4" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    {isRegistrarDeleted ? 'რეგისტრატორის აღდგენა' : 'რეგისტრატორის წაშლა'}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">
+                წაშლის შემდეგ რეგისტრატორის ანგარიში სისტემაში ვეღარ შევა, სანამ ადმინისტრატორი ხელახლა არ აღადგენს.
+              </p>
+            </div>
           </div>
         </div>
 

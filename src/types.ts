@@ -58,6 +58,7 @@ export interface SystemSettings {
   googleDriveFolderId?: string;
   sheetName?: string;
   sheetGid?: string;
+  disabledEmails?: string[];
   columnMapping: {
     firstName: string;
     lastName: string;

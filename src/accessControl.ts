@@ -20,6 +20,8 @@ export const ALLOWED_USERS: Record<string, AllowedUserConfig> = {
   },
 };
 
+export const REGISTRAR_EMAIL = 'emergencyhtmc14@gmail.com';
+
 export const ACCESS_DENIED_MESSAGE =
   'წვდომა აქვს მხოლოდ წინასწარ ავტორიზებულ Google ანგარიშებს. გამოიყენეთ დაშვებული ელ-ფოსტა.';
 

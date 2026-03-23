@@ -18,6 +18,14 @@ service cloud.firestore {
         request.auth.token.firebase.sign_in_provider == "password";
     }
 
+    function hasGlobalSettings() {
+      return exists(/databases/$(database)/documents/settings/global);
+    }
+
+    function globalSettings() {
+      return get(/databases/$(database)/documents/settings/global).data;
+    }
+
     function emailRole() {
       return request.auth.token.email == "imedashviligio27@gmail.com" ? "admin" :
         request.auth.token.email == "eringorokva@gmail.com" ? "doctor" :
@@ -25,11 +33,22 @@ service cloud.firestore {
         "";
     }
 
-    function isAllowedEmail() {
+    function isAllowedEmailCandidate() {
       return isAuthenticated() &&
         request.auth.token.email != null &&
         emailRole() != "" &&
         (isVerifiedEmail() || isPasswordProvider());
+    }
+
+    function isEmailDisabled() {
+      return isAllowedEmailCandidate() &&
+        hasGlobalSettings() &&
+        ('disabledEmails' in globalSettings()) &&
+        request.auth.token.email in globalSettings().disabledEmails;
+    }
+
+    function isAllowedEmail() {
+      return isAllowedEmailCandidate() && !isEmailDisabled();
     }
 
     function hasUserProfile() {
@@ -113,7 +132,7 @@ service cloud.firestore {
     }
 
     match /settings/{settingId} {
-      allow read: if isAllowedEmail();
+      allow read: if isAllowedEmailCandidate();
       allow write: if isAdmin();
     }
   }

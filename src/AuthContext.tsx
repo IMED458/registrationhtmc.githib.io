@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ACCESS_DENIED_MESSAGE, getAllowedUserConfig } from './accessControl';
+import { ACCESS_DENIED_MESSAGE, getAllowedUserConfig, normalizeEmail } from './accessControl';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { UserProfile } from './types';
+import { SystemSettings, UserProfile } from './types';
 
 interface AuthContextType {
   authError: string;
@@ -17,6 +17,16 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function getDisabledEmails(settings: Partial<SystemSettings> | null | undefined) {
+  if (!Array.isArray(settings?.disabledEmails)) {
+    return [];
+  }
+
+  return settings.disabledEmails
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authError, setAuthError] = useState('');
@@ -56,6 +66,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await signOut(auth);
           setLoading(false);
           return;
+        }
+
+        try {
+          const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+          const settings = settingsSnap.exists()
+            ? (settingsSnap.data() as Partial<SystemSettings>)
+            : null;
+
+          if (getDisabledEmails(settings).includes(allowedUser.email)) {
+            setUser(null);
+            setProfile(null);
+            setAuthError('ამ ანგარიშის წვდომა ადმინისტრატორმა გათიშა.');
+            await signOut(auth);
+            setLoading(false);
+            return;
+          }
+        } catch (settingsError) {
+          console.warn('System settings read failed during auth check:', settingsError);
         }
 
         setAuthError('');
