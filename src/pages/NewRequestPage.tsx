@@ -24,6 +24,7 @@ export default function NewRequestPage() {
   const canCreateRequests = isAdmin || isDoctorOrNurse;
   const icdLookupRequestRef = useRef(0);
   const requiresStructuredFields = patientLookupSource === 'sheet';
+  const automaticSenderName = profile?.fullName?.trim() || profile?.email?.split('@')[0] || 'ემერჯენსი';
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
@@ -46,7 +47,8 @@ export default function NewRequestPage() {
     department: '',
     studyType: '',
     consentStatus: '',
-    doctorComment: ''
+    doctorComment: '',
+    senderName: '',
   });
 
   const filteredDepts = DEPARTMENTS.filter(d => 
@@ -279,7 +281,7 @@ export default function NewRequestPage() {
           address: formData.address,
         },
         createdByUserId: profile.uid,
-        createdByUserName: profile.fullName,
+        createdByUserName: formData.senderName.trim() || automaticSenderName,
         createdByUserEmail: profile.email,
         requestedAction: formData.requestedAction,
         department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
@@ -710,6 +712,23 @@ export default function NewRequestPage() {
                 value={formData.doctorComment}
                 onChange={(e) => setFormData({ ...formData, doctorComment: e.target.value })}
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">
+                გამომგზავნის სახელი
+                <span className="ml-2 text-xs font-medium text-slate-400">(არასავალდებულო)</span>
+              </label>
+              <input
+                type="text"
+                placeholder={`ავტომატურად: ${automaticSenderName}`}
+                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                value={formData.senderName}
+                onChange={(e) => setFormData({ ...formData, senderName: e.target.value })}
+              />
+              <p className="text-xs text-slate-400">
+                თუ ხელით არ ჩაწერთ, დარჩება მიმდინარე ავტომატური გამომგზავნი.
+              </p>
             </div>
           </div>
         </div>
