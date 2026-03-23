@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { ClinicalRequest } from '../types';
+import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
