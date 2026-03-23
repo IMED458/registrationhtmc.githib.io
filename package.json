@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
+    "build": "vite build && cp dist/app.html dist/index.html",
+    "build:pages": "VITE_BASE_PATH=/registrationhtmc.githib.io/docs/ vite build --outDir docs && cp docs/app.html docs/index.html && cp docs/index.html docs/404.html && touch docs/.nojekyll",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist docs",
     "lint": "eslint ."
   },
   "dependencies": {

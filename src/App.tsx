@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
@@ -9,6 +9,10 @@ import PrintPage from './pages/PrintPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import FirebaseSetupPage from './pages/FirebaseSetupPage';
 import { isFirebaseConfigured } from './firebase';
+
+const Router = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io')
+  ? HashRouter
+  : BrowserRouter;
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -40,7 +44,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/login" element={<LoginRoute />} />
           
@@ -76,7 +80,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </AuthProvider>
   );
 }

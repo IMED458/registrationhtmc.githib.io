@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="0; url=/registrationhtmc.githib.io/docs/" />
+    <title>Redirecting...</title>
+    <script>
+      const repoBase = '/registrationhtmc.githib.io';
+      const docsBase = `${repoBase}/docs/`;
+      const path = window.location.pathname.startsWith(repoBase)
+        ? window.location.pathname.slice(repoBase.length)
+        : window.location.pathname;
+      const redirectUrl = `${docsBase}#${path}${window.location.search}${window.location.hash}`;
+      window.location.replace(redirectUrl);
+    </script>
+  </head>
+  <body></body>
+</html>

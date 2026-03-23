@@ -7,14 +7,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module">
-      const isGitHubPages = window.location.hostname.endsWith('github.io');
-
-      if (isGitHubPages) {
-        window.location.replace('/registrationhtmc.githib.io/docs/');
-      } else {
-        import('/src/main.tsx');
-      }
-    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
