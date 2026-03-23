@@ -297,7 +297,6 @@ export default function NewRequestPage() {
       });
 
       const sheetSyncUrl = resolveServerApiUrl('/api/external/sync-request');
-      let sheetSyncWarning = '';
 
       if (sheetSyncUrl) {
         try {
@@ -318,19 +317,10 @@ export default function NewRequestPage() {
           if (!syncResponse.ok) {
             const syncError = await syncResponse.json().catch(() => null);
             console.error('Sheet sync error:', syncError);
-            sheetSyncWarning = 'მოთხოვნა შეინახა, მაგრამ ექსელში H/I სვეტების ჩაწერა ვერ მოხერხდა.';
           }
         } catch (sheetSyncError) {
           console.error('Sheet sync request failed:', sheetSyncError);
-          sheetSyncWarning = 'მოთხოვნა შეინახა, მაგრამ ექსელში H/I სვეტების ჩაწერა ვერ მოხერხდა.';
         }
-      } else {
-        sheetSyncWarning =
-          'მოთხოვნა შეინახა, მაგრამ live საიტზე Excel sync backend ჯერ არ არის მიერთებული, ამიტომ H/I სვეტები არ ჩაიწერა.';
-      }
-
-      if (sheetSyncWarning) {
-        alert(sheetSyncWarning);
       }
 
       navigate('/');
