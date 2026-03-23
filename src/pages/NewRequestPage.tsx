@@ -24,6 +24,8 @@ export default function NewRequestPage() {
   const canCreateRequests = isAdmin || isDoctorOrNurse;
   const icdLookupRequestRef = useRef(0);
   const requiresStructuredFields = patientLookupSource === 'sheet';
+  const requiresDiagnosisDescription =
+    requiresStructuredFields && formData.requestedAction !== 'კვლევა';
   const automaticSenderName = profile?.fullName?.trim() || profile?.email?.split('@')[0] || 'ემერჯენსი';
   
   const [deptSearch, setDeptSearch] = useState('');
@@ -255,7 +257,7 @@ export default function NewRequestPage() {
       return;
     }
 
-    if (requiresStructuredFields && !formData.diagnosis.trim()) {
+    if (requiresDiagnosisDescription && !formData.diagnosis.trim()) {
       setError('ICD-10 კოდის მიხედვით შეავსეთ დიაგნოზის განმარტება.');
       return;
     }
@@ -541,10 +543,15 @@ export default function NewRequestPage() {
               </div>
 
               <div className="space-y-2 relative">
-                <label className="text-sm font-bold text-slate-700">დიაგნოზის განმარტება</label>
+                <label className="text-sm font-bold text-slate-700">
+                  დიაგნოზის განმარტება
+                  {formData.requestedAction === 'კვლევა' && (
+                    <span className="ml-2 text-xs font-medium text-slate-400">(კვლევის შემთხვევაში არჩევითი)</span>
+                  )}
+                </label>
                 <input
                   type="text"
-                  required={requiresStructuredFields}
+                  required={requiresDiagnosisDescription}
                   placeholder="აირჩიეთ ICD-10 კოდი ან მოძებნეთ დიაგნოზით"
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.diagnosis}

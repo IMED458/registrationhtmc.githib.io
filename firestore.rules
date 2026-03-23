@@ -47,6 +47,20 @@ service cloud.firestore {
       );
     }
 
+    function registrarTouchesOnlyPendingFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "pendingRegistrarUpdate",
+        "updatedAt"
+      ]);
+    }
+
+    function registrarPendingUpdatePayloadIsValid() {
+      return request.resource.data.pendingRegistrarUpdate != null &&
+        request.resource.data.pendingRegistrarUpdate.currentStatus != null &&
+        request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
+        request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
+    }
+
     match /users/{userId} {
       allow read: if isAllowedUser();
 
@@ -62,7 +76,11 @@ service cloud.firestore {
         request.resource.data.createdByUserEmail == userEmail();
 
       allow update: if isAdmin() ||
-        isRegistrar() ||
+        (
+          isRegistrar() &&
+          registrarTouchesOnlyPendingFields() &&
+          registrarPendingUpdatePayloadIsValid()
+        ) ||
         (
           isDoctor() &&
           isRequestOwner() &&

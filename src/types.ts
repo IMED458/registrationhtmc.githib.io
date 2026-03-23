@@ -20,6 +20,18 @@ export interface Patient {
 
 export type RequestStatus = 'ახალი' | 'განხილვაშია' | 'დადასტურებულია' | 'დასრულებულია' | 'უარყოფილია';
 
+export interface PendingRegistrarUpdate {
+  currentStatus: RequestStatus;
+  finalDecision?: string;
+  registrarComment?: string;
+  registrarName?: string;
+  formFillerName?: string;
+  requestedAt: any;
+  requestedByUserEmail?: string;
+  requestedByUserId: string;
+  requestedByUserName: string;
+}
+
 export interface ClinicalRequest {
   id: string;
   patientData: Patient;
@@ -37,6 +49,7 @@ export interface ClinicalRequest {
   registrarName?: string;
   formFillerName?: string;
   finalDecision?: string;
+  pendingRegistrarUpdate?: PendingRegistrarUpdate | null;
   currentStatus: RequestStatus;
   createdAt: any;
   updatedAt: any;

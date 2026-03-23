@@ -67,6 +67,7 @@ export default function Dashboard() {
   const [deletingRequestId, setDeletingRequestId] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
+  const pendingApprovals = requests.filter((request) => Boolean(request.pendingRegistrarUpdate));
 
   useEffect(() => {
     if (!profile) {
@@ -315,6 +316,43 @@ export default function Dashboard() {
         </div>
       )}
 
+      {isAdmin && pendingApprovals.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-black text-amber-900">
+                ადმინის დადასტურებას ელოდება {pendingApprovals.length} ცვლილება
+              </div>
+              <p className="mt-1 text-sm text-amber-800">
+                რეგისტრატორის მოთხოვნილი სტატუსის ცვლილებები ქვემოთვე გამოჩნდება და დეტალებიდან შეგიძლიათ დაამტკიცოთ.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {pendingApprovals.slice(0, 4).map((request) => (
+              <button
+                key={`pending-${request.id}`}
+                type="button"
+                onClick={() => navigate(`/request/${request.id}`)}
+                className="rounded-2xl border border-amber-200 bg-white px-4 py-3 text-left transition hover:bg-amber-100/40"
+              >
+                <div className="text-sm font-bold text-slate-900">
+                  {request.patientData.firstName} {request.patientData.lastName}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {request.pendingRegistrarUpdate?.requestedByUserName || 'რეგისტრატორი'} ითხოვს:
+                </div>
+                <div className="mt-2 text-sm font-bold text-amber-800">
+                  {request.pendingRegistrarUpdate?.currentStatus}
+                  {request.pendingRegistrarUpdate?.finalDecision ? ` / ${request.pendingRegistrarUpdate.finalDecision}` : ''}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {requestsError && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {requestsError}
@@ -396,6 +434,15 @@ export default function Dashboard() {
                     <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">საბოლოო გადაწყვეტილება</div>
                     <div className={`mt-1 text-sm font-bold leading-5 ${getFinalDecisionTextClass(req.finalDecision)}`}>
                       {req.finalDecision}
+                    </div>
+                  </div>
+                )}
+                {req.pendingRegistrarUpdate && (
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-amber-600">ელოდება დადასტურებას</div>
+                    <div className="mt-1 text-sm font-bold text-amber-700">
+                      {req.pendingRegistrarUpdate.currentStatus}
+                      {req.pendingRegistrarUpdate.finalDecision ? ` / ${req.pendingRegistrarUpdate.finalDecision}` : ''}
                     </div>
                   </div>
                 )}
@@ -510,6 +557,12 @@ export default function Dashboard() {
                         {req.finalDecision && (
                           <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
                             {req.finalDecision}
+                          </div>
+                        )}
+                        {req.pendingRegistrarUpdate && (
+                          <div className="max-w-xs text-sm font-bold leading-5 whitespace-normal text-amber-700">
+                            ადმინის დასადასტურებელია: {req.pendingRegistrarUpdate.currentStatus}
+                            {req.pendingRegistrarUpdate.finalDecision ? ` / ${req.pendingRegistrarUpdate.finalDecision}` : ''}
                           </div>
                         )}
                       </div>
