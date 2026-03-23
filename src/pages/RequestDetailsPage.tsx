@@ -463,6 +463,12 @@ export default function RequestDetailsPage() {
     }
 
     setFormError('');
+
+    if (isRegistrarOnly) {
+      void submitUpdate('save');
+      return;
+    }
+
     setConfirmAction('save');
   };
 
@@ -493,8 +499,10 @@ export default function RequestDetailsPage() {
     setConfirmAction('approve');
   };
 
-  const submitUpdate = async () => {
-    if (!id || !profile || !request || !confirmAction) {
+  const submitUpdate = async (actionOverride?: ConfirmAction) => {
+    const action = actionOverride ?? confirmAction;
+
+    if (!id || !profile || !request || !action) {
       return;
     }
 
@@ -503,7 +511,7 @@ export default function RequestDetailsPage() {
     try {
       const requestRef = doc(db, 'requests', id);
 
-      if (confirmAction === 'approve' && (pendingUpdate || pendingDoctorEdit)) {
+      if (action === 'approve' && (pendingUpdate || pendingDoctorEdit)) {
         const confirmingDoctorEdit = Boolean(pendingDoctorEdit && !pendingUpdate);
 
         await updateDoc(requestRef, {
@@ -744,7 +752,7 @@ export default function RequestDetailsPage() {
       console.error('Update error:', err);
 
       const fallbackMessage =
-        confirmAction === 'approve'
+        action === 'approve'
           ? 'რედაქტირების დადასტურება ვერ მოხერხდა.'
           : 'განახლება ვერ მოხერხდა.';
 
