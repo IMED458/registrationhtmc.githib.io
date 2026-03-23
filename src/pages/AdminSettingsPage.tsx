@@ -143,7 +143,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="w-full max-w-none space-y-8 pb-12">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">ადმინისტრირება</h2>
+        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">ადმინისტრირება</h2>
         <p className="text-slate-500">სისტემის პარამეტრები და აუდიტი</p>
       </div>
 
@@ -191,8 +191,8 @@ export default function AdminSettingsPage() {
                 <h4 className="text-xs font-black uppercase text-slate-400 mb-4">სვეტების Mapping (Excel/Sheets)</h4>
                 <div className="grid grid-cols-1 gap-4">
                   {Object.keys(settings.columnMapping).map((key) => (
-                    <div key={key} className="flex items-center gap-4">
-                      <span className="text-sm text-slate-600 w-32 flex-shrink-0">{key}</span>
+                    <div key={key} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                      <span className="w-full flex-shrink-0 text-sm text-slate-600 sm:w-32">{key}</span>
                       <input
                         type="text"
                         className="flex-1 px-4 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -238,7 +238,7 @@ export default function AdminSettingsPage() {
                     type="button"
                     onClick={handleToggleRegistrar}
                     disabled={registrarSaving}
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-bold text-white transition disabled:opacity-50 ${
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 font-bold text-white transition disabled:opacity-50 sm:w-auto ${
                       isRegistrarDeleted
                         ? 'bg-emerald-600 hover:bg-emerald-700'
                         : 'bg-red-600 hover:bg-red-700'
@@ -271,7 +271,7 @@ export default function AdminSettingsPage() {
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {logs.map((log) => (
               <div key={log.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
-                <div className="flex justify-between font-bold text-slate-700">
+                <div className="flex flex-col gap-1 font-bold text-slate-700 sm:flex-row sm:items-center sm:justify-between">
                   <span>{log.userName}</span>
                   <span className="text-slate-400">
                     {log.createdAt?.toDate ? format(log.createdAt.toDate(), 'dd.MM HH:mm', { locale: ka }) : '-'}

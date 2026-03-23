@@ -110,14 +110,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-8 border border-slate-100">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-xl sm:p-8 sm:space-y-8">
         <div className="text-center">
-          <div className="inline-flex bg-emerald-600 p-4 rounded-2xl mb-4 shadow-lg shadow-emerald-200">
+          <div className="mb-4 inline-flex rounded-2xl bg-emerald-600 p-3 shadow-lg shadow-emerald-200 sm:p-4">
             <ClipboardList className="text-white w-10 h-10" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">კლინიკის სისტემა</h1>
-          <p className="text-slate-500 mt-2">
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">კლინიკის სისტემა</h1>
+          <p className="mt-2 text-sm text-slate-500 sm:text-base">
             სისტემაში შესვლა შეუძლიათ მხოლოდ წინასწარ განსაზღვრულ თანამშრომლებს
           </p>
         </div>

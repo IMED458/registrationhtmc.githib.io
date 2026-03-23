@@ -238,14 +238,14 @@ export default function NewRequestPage() {
 
   return (
     <div className="w-full max-w-none space-y-6 pb-12">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <button
           onClick={() => navigate(-1)}
           className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-6 h-6 text-slate-500" />
         </button>
-        <h2 className="text-2xl font-bold text-slate-900">ახალი მოთხოვნის შექმნა</h2>
+        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">ახალი მოთხოვნის შექმნა</h2>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -270,7 +270,7 @@ export default function NewRequestPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">ისტორიის ნომერი</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
                     required
@@ -282,7 +282,7 @@ export default function NewRequestPage() {
                     type="button"
                     onClick={handleLookup}
                     disabled={searching}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-slate-700 transition-colors hover:bg-slate-200 sm:px-4"
                   >
                     {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     ძებნა
@@ -509,18 +509,18 @@ export default function NewRequestPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-4">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors"
+            className="w-full rounded-xl px-6 py-3 font-bold text-slate-600 transition-colors hover:bg-slate-100 sm:w-auto"
           >
             გაუქმება
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center gap-2 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 font-bold text-white transition-all shadow-lg shadow-emerald-100 hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             მოთხოვნის გაგზავნა

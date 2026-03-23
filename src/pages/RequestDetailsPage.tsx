@@ -175,16 +175,16 @@ export default function RequestDetailsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
             <ArrowLeft className="w-6 h-6 text-slate-500" />
           </button>
-          <h2 className="text-2xl font-bold text-slate-900">მოთხოვნის დეტალები</h2>
+          <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნის დეტალები</h2>
         </div>
         <button
           onClick={() => navigate(`/print/${id}`)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-100"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-bold text-white transition-all shadow-lg shadow-blue-100 hover:bg-blue-700 sm:w-auto sm:py-2"
         >
           <Printer className="w-5 h-5" />
           ბეჭდვა
@@ -199,7 +199,7 @@ export default function RequestDetailsPage() {
               <User className="w-5 h-5 text-emerald-600" />
               <h3 className="font-bold text-slate-700">პაციენტის ინფორმაცია</h3>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-y-4 gap-x-6">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 p-4 sm:p-6 md:grid-cols-2">
               <div>
                 <div className="text-xs text-slate-400 uppercase font-bold">სახელი, გვარი</div>
                 <div className="font-bold text-slate-900">{request.patientData.firstName} {request.patientData.lastName}</div>
@@ -216,7 +216,7 @@ export default function RequestDetailsPage() {
                 <div className="text-xs text-slate-400 uppercase font-bold">დაბადების თარიღი</div>
                 <div className="text-slate-700">{request.patientData.birthDate || '-'}</div>
               </div>
-              <div className="col-span-2">
+              <div className="md:col-span-2">
                 <div className="text-xs text-slate-400 uppercase font-bold">მისამართი</div>
                 <div className="text-slate-700">{request.patientData.address || '-'}</div>
               </div>
@@ -229,8 +229,8 @@ export default function RequestDetailsPage() {
               <FileText className="w-5 h-5 text-emerald-600" />
               <h3 className="font-bold text-slate-700">მოთხოვნის დეტალები</h3>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-4 p-4 sm:p-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">მოთხოვნილი მოქმედება</div>
                   <div className="font-bold text-slate-900">
@@ -242,7 +242,7 @@ export default function RequestDetailsPage() {
                   <div className="font-bold text-emerald-600">{request.studyType || '-'}</div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">დიაგნოზი (ICD-10)</div>
                   <div className="font-bold text-slate-900 mt-1">{request.icdCode || request.diagnosis || '-'}</div>
@@ -270,7 +270,7 @@ export default function RequestDetailsPage() {
                 <CheckCircle2 className="w-5 h-5 text-blue-600" />
                 <h3 className="font-bold text-slate-700">რეგისტრატურის ინფორმაცია</h3>
               </div>
-              <div className="p-6 grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 md:grid-cols-2">
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">რეგისტრატორი</div>
                   <div className="font-bold text-slate-900">{request.registrarName || '-'}</div>
@@ -287,12 +287,12 @@ export default function RequestDetailsPage() {
         <div className="space-y-6">
           {/* Status Update Card (Registrar/Admin only) */}
           {(isRegistrar || isAdmin) && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                 <h3 className="font-bold text-slate-700">სტატუსის მართვა</h3>
               </div>
-              <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">მიმდინარე სტატუსი</label>
                   <select
@@ -364,24 +364,24 @@ export default function RequestDetailsPage() {
           )}
 
           {/* Metadata Card */}
-          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4 sm:p-6">
             <div className="flex items-center gap-2 text-slate-500">
               <Clock className="w-4 h-4" />
               <span className="text-xs font-bold uppercase">ისტორია</span>
             </div>
             <div className="space-y-3">
-              <div className="flex justify-between text-sm">
+              <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-slate-500">გამომგზავნი:</span>
                 <span className="font-medium text-slate-700">{request.createdByUserName}</span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-slate-500">შექმნილია:</span>
                 <span className="font-medium text-slate-700">
                   {request.createdAt?.toDate ? format(request.createdAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka }) : '-'}
                 </span>
               </div>
               {request.updatedAt && (
-                <div className="flex justify-between text-sm">
+                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-slate-500">განახლდა:</span>
                   <span className="font-medium text-slate-700">
                     {request.updatedAt?.toDate ? format(request.updatedAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka }) : '-'}
@@ -402,7 +402,7 @@ export default function RequestDetailsPage() {
                 ნამდვილად გსურთ სტატუსის განახლება?
               </p>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setShowUpdateConfirm(false)}
@@ -432,7 +432,7 @@ export default function RequestDetailsPage() {
                 ცვლილება შენახულია და მთავარ პანელზეც გამოჩნდება.
               </p>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setShowSuccessDialog(false)}

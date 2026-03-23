@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { getRoleLabel } from '../accessControl';
 import { useAuth } from '../AuthContext';
 import { auth } from '../firebase';
@@ -7,6 +7,20 @@ import { ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
+
+  const navItemClassName = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 rounded-lg px-3 py-2 font-medium transition-colors ${
+      isActive
+        ? 'bg-emerald-50 text-emerald-700'
+        : 'text-slate-700 hover:bg-slate-100'
+    }`;
+
+  const mobileNavItemClassName = ({ isActive }: { isActive: boolean }) =>
+    `flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-center transition-colors ${
+      isActive
+        ? 'bg-emerald-50 text-emerald-700'
+        : 'text-slate-500 hover:bg-slate-100'
+    }`;
 
   const handleLogout = async () => {
     if (!auth) {
@@ -27,16 +41,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="bg-emerald-600 p-2 rounded-lg">
                 <ClipboardList className="text-white w-6 h-6" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900 hidden sm:block">
+              <h1 className="hidden text-xl font-bold text-slate-900 sm:block">
                 კლინიკის მართვის სისტემა
+              </h1>
+              <h1 className="text-lg font-bold text-slate-900 sm:hidden">
+                კლინიკა
               </h1>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full">
-                <User className="w-4 h-4 text-slate-500" />
-                <span className="text-sm font-medium text-slate-700">{profile?.fullName}</span>
-                <span className="text-xs text-slate-500 font-bold">({getRoleLabel(profile?.role)})</span>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="flex max-w-[13rem] items-center gap-2 rounded-full bg-slate-100 px-3 py-1 sm:max-w-none">
+                <User className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-slate-700">{profile?.fullName}</div>
+                  <div className="truncate text-[11px] font-bold text-slate-500 sm:hidden">
+                    {getRoleLabel(profile?.role)}
+                  </div>
+                </div>
+                <span className="hidden text-xs font-bold text-slate-500 sm:inline">
+                  ({getRoleLabel(profile?.role)})
+                </span>
               </div>
               <button
                 onClick={handleLogout}
@@ -53,40 +77,71 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 w-full min-h-0">
         <aside className="hidden md:block md:w-72 md:shrink-0 md:border-r md:border-slate-200 md:bg-white md:p-4 md:space-y-2 md:sticky md:top-16 md:h-[calc(100vh-4rem)]">
           <nav className="space-y-1">
-            <Link
+            <NavLink
               to="/"
-              className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+              className={navItemClassName}
             >
               <LayoutDashboard className="w-5 h-5 text-slate-400" />
               მთავარი პანელი
-            </Link>
+            </NavLink>
             
             {(isDoctorOrNurse || isAdmin) && (
-              <Link
+              <NavLink
                 to="/new-request"
-                className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                className={navItemClassName}
               >
                 <FilePlus className="w-5 h-5 text-slate-400" />
                 ახალი მოთხოვნა
-              </Link>
+              </NavLink>
             )}
 
             {isAdmin && (
-              <Link
+              <NavLink
                 to="/settings"
-                className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                className={navItemClassName}
               >
                 <Settings className="w-5 h-5 text-slate-400" />
                 პარამეტრები
-              </Link>
+              </NavLink>
             )}
           </nav>
         </aside>
 
-        <main className="flex-1 min-w-0 overflow-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 min-w-0 overflow-auto p-4 pb-24 sm:p-6 sm:pb-28 lg:p-8 lg:pb-8">
           {children}
         </main>
       </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
+        <div className="grid grid-cols-3 gap-2">
+          <NavLink to="/" className={mobileNavItemClassName}>
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="text-xs">მთავარი</span>
+          </NavLink>
+
+          {(isDoctorOrNurse || isAdmin) ? (
+            <NavLink to="/new-request" className={mobileNavItemClassName}>
+              <FilePlus className="h-5 w-5" />
+              <span className="text-xs">მოთხოვნა</span>
+            </NavLink>
+          ) : (
+            <div className="rounded-xl px-2 py-2 text-center text-xs font-medium text-slate-300">
+              მოთხოვნა
+            </div>
+          )}
+
+          {isAdmin ? (
+            <NavLink to="/settings" className={mobileNavItemClassName}>
+              <Settings className="h-5 w-5" />
+              <span className="text-xs">ადმინი</span>
+            </NavLink>
+          ) : (
+            <div className="rounded-xl px-2 py-2 text-center text-xs font-medium text-slate-300">
+              პარამეტრები
+            </div>
+          )}
+        </div>
+      </nav>
     </div>
   );
 }

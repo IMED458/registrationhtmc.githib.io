@@ -42,6 +42,12 @@ function getRequestActionTextClass(request: ClinicalRequest) {
     : 'text-slate-700';
 }
 
+function getCreatedAtLabel(request: ClinicalRequest) {
+  return request.createdAt?.toDate
+    ? format(request.createdAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka })
+    : '-';
+}
+
 export default function Dashboard() {
   const { profile, isDoctorOrNurse, isRegistrar, isAdmin } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
@@ -226,8 +232,96 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="space-y-4 md:hidden">
+        {loading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-slate-400 shadow-sm">
+            იტვირთება მონაცემები...
+          </div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-slate-400 shadow-sm">
+            ჩანაწერები არ მოიძებნა
+          </div>
+        ) : (
+          filteredRequests.map((req) => (
+            <div
+              key={req.id}
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-base font-bold text-slate-900">
+                    {req.patientData.firstName} {req.patientData.lastName}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {req.patientData.historyNumber} / {req.patientData.personalId}
+                  </div>
+                </div>
+                <span className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
+                  getStatusColor(req.currentStatus)
+                )}>
+                  {getStatusIcon(req.currentStatus)}
+                  {req.currentStatus}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl bg-slate-50 p-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დიაგნოზი</div>
+                  <div className="mt-1 inline-flex rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-black text-slate-900">
+                    {req.icdCode || req.diagnosis || '-'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">მოთხოვნა</div>
+                  <div className={`mt-1 text-sm font-bold ${getRequestActionTextClass(req)}`}>
+                    {getRequestActionLabel(req)}
+                  </div>
+                  {req.studyType && (
+                    <div className="mt-1 text-xs font-bold text-emerald-600">{req.studyType}</div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">გამომგზავნი</div>
+                  <div className="mt-1 text-sm text-slate-700">{req.createdByUserName}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">თარიღი</div>
+                  <div className="mt-1 text-sm text-slate-700">{getCreatedAtLabel(req)}</div>
+                </div>
+                {req.finalDecision && (
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">საბოლოო გადაწყვეტილება</div>
+                    <div className={`mt-1 text-sm font-bold leading-5 ${getFinalDecisionTextClass(req.finalDecision)}`}>
+                      {req.finalDecision}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => navigate(`/request/${req.id}`)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  დეტალები
+                </button>
+                <button
+                  onClick={() => navigate(`/print/${req.id}`)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                >
+                  <Printer className="h-4 w-4" />
+                  ბეჭდვა
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -297,7 +391,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-slate-600">
-                        {req.createdAt?.toDate ? format(req.createdAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka }) : '-'}
+                        {getCreatedAtLabel(req)}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
