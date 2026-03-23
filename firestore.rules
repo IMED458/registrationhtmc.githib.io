@@ -61,6 +61,15 @@ service cloud.firestore {
         request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
     }
 
+    function registrarCanMarkInReview() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "currentStatus",
+        "updatedAt"
+      ]) &&
+        resource.data.currentStatus == "ახალი" &&
+        request.resource.data.currentStatus == "განხილვაშია";
+    }
+
     match /users/{userId} {
       allow read: if isAllowedUser();
 
@@ -78,8 +87,13 @@ service cloud.firestore {
       allow update: if isAdmin() ||
         (
           isRegistrar() &&
-          registrarTouchesOnlyPendingFields() &&
-          registrarPendingUpdatePayloadIsValid()
+          (
+            registrarCanMarkInReview() ||
+            (
+              registrarTouchesOnlyPendingFields() &&
+              registrarPendingUpdatePayloadIsValid()
+            )
+          )
         ) ||
         (
           isDoctor() &&

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -70,6 +70,7 @@ export default function RequestDetailsPage() {
     message: string;
   } | null>(null);
   const [syncNoticeMessage, setSyncNoticeMessage] = useState('');
+  const autoStatusSyncRef = useRef(false);
 
   const [formData, setFormData] = useState({
     currentStatus: '',
@@ -81,6 +82,46 @@ export default function RequestDetailsPage() {
 
   const isRegistrarOnly = isRegistrar && !isAdmin;
   const pendingUpdate = request?.pendingRegistrarUpdate || null;
+
+  useEffect(() => {
+    if (!id || !profile || !request || !isRegistrarOnly) {
+      return;
+    }
+
+    if (request.currentStatus !== 'ახალი') {
+      autoStatusSyncRef.current = false;
+      return;
+    }
+
+    if (autoStatusSyncRef.current) {
+      return;
+    }
+
+    autoStatusSyncRef.current = true;
+
+    const markAsInReview = async () => {
+      try {
+        await updateDoc(doc(db, 'requests', id), {
+          currentStatus: 'განხილვაშია',
+          updatedAt: Timestamp.now(),
+        });
+
+        await writeAuditLogEntry({
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: id,
+          actionType: 'AUTO_IN_REVIEW',
+          oldValue: 'ახალი',
+          newValue: 'განხილვაშია',
+        });
+      } catch (error) {
+        console.error('Auto in-review sync failed:', error);
+        autoStatusSyncRef.current = false;
+      }
+    };
+
+    void markAsInReview();
+  }, [id, isRegistrarOnly, profile, request]);
 
   useEffect(() => {
     if (!id) {
