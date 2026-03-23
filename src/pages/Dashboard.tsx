@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
-import { getDiagnosisDisplayParts, normalizeIcdCode } from '../icd10Utils';
+import { getDiagnosisEntries, getDiagnosisSearchText, normalizeIcdCode } from '../icd10Utils';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
 import { CheckCircle2, Clock, Filter, Loader2, MoreHorizontal, Plus, Printer, Search, Trash2, XCircle } from 'lucide-react';
@@ -108,8 +108,40 @@ function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
   );
 }
 
+function DiagnosisList({ request }: { request: ClinicalRequest }) {
+  const diagnoses = getDiagnosisEntries(request);
+
+  if (!diagnoses.length) {
+    return <span className="text-sm text-slate-400">-</span>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {diagnoses.map((diagnosisEntry, index) => (
+        <div key={`${diagnosisEntry.code || diagnosisEntry.description || 'diagnosis'}-${index}`} className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-black text-slate-900">
+              {diagnosisEntry.code || diagnosisEntry.combined}
+            </span>
+            {diagnosisEntry.isPrimary && (
+              <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-black text-sky-700">
+                წამყვანი
+              </span>
+            )}
+          </div>
+          {diagnosisEntry.description && (
+            <div className="text-sm leading-5 text-slate-600">
+              {diagnosisEntry.description}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Dashboard() {
-  const { profile, isDoctorOrNurse, isRegistrar, isAdmin } = useAuth();
+  const { profile, isDoctorOrNurse, isAdmin } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestsError, setRequestsError] = useState('');
@@ -129,84 +161,6 @@ export default function Dashboard() {
 
     setLoading(true);
     setRequestsError('');
-
-    if (isDoctorOrNurse && !isAdmin) {
-      const requestsByUid = new Map<string, ClinicalRequest>();
-      const requestsByEmail = new Map<string, ClinicalRequest>();
-      let uidLoaded = false;
-      let emailLoaded = !profile.email;
-
-      const syncRequests = () => {
-        const merged = new Map<string, ClinicalRequest>([
-          ...requestsByUid.entries(),
-          ...requestsByEmail.entries(),
-        ]);
-
-        setRequests(sortRequestsByCreatedAt(Array.from(merged.values())));
-
-        if (uidLoaded && emailLoaded) {
-          setLoading(false);
-        }
-      };
-
-      const unsubscribeByUid = onSnapshot(
-        query(collection(db, 'requests'), where('createdByUserId', '==', profile.uid)),
-        (snapshot) => {
-          requestsByUid.clear();
-          snapshot.docs.forEach((requestDoc) => {
-            requestsByUid.set(requestDoc.id, { id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest);
-          });
-          uidLoaded = true;
-          syncRequests();
-        },
-        (error) => {
-          console.error('Firestore Error:', error);
-          setRequestsError(
-            getFirebaseActionErrorMessage(error, {
-              fallback: 'მოთხოვნების ჩატვირთვა ვერ მოხერხდა.',
-              permissionDenied:
-                'რეგისტრატურის/მომხმარებლის მოთხოვნების წაკითხვა ვერ მოხერხდა. გადაამოწმეთ Firestore Rules.',
-            }),
-          );
-          uidLoaded = true;
-          syncRequests();
-        },
-      );
-
-      const unsubscribers = [unsubscribeByUid];
-
-      if (profile.email) {
-        const unsubscribeByEmail = onSnapshot(
-          query(collection(db, 'requests'), where('createdByUserEmail', '==', profile.email)),
-          (snapshot) => {
-            requestsByEmail.clear();
-            snapshot.docs.forEach((requestDoc) => {
-              requestsByEmail.set(requestDoc.id, { id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest);
-            });
-            emailLoaded = true;
-            syncRequests();
-          },
-          (error) => {
-            console.error('Firestore Error:', error);
-            setRequestsError(
-              getFirebaseActionErrorMessage(error, {
-                fallback: 'მოთხოვნების ჩატვირთვა ვერ მოხერხდა.',
-                permissionDenied:
-                  'მოთხოვნების წაკითხვა ვერ მოხერხდა. გადაამოწმეთ Firestore Rules.',
-              }),
-            );
-            emailLoaded = true;
-            syncRequests();
-          },
-        );
-
-        unsubscribers.push(unsubscribeByEmail);
-      }
-
-      return () => {
-        unsubscribers.forEach((unsubscribe) => unsubscribe());
-      };
-    }
 
     const unsubscribe = onSnapshot(
       collection(db, 'requests'),
@@ -230,17 +184,18 @@ export default function Dashboard() {
     );
 
     return unsubscribe;
-  }, [profile, isDoctorOrNurse, isAdmin]);
+  }, [profile]);
 
   const filteredRequests = requests.filter(req => {
+    const diagnosisSearchText = getDiagnosisSearchText(req).toLowerCase();
     const normalizedIcdSearch = normalizeIcdCode(searchTerm);
-    const normalizedRequestCode = normalizeIcdCode(req.icdCode || req.diagnosis || '');
+    const normalizedRequestCode = normalizeIcdCode(diagnosisSearchText);
     const matchesSearch = 
       req.patientData.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.patientData.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.patientData.historyNumber.includes(searchTerm) ||
       req.patientData.personalId.includes(searchTerm) ||
-      (req.icdCode || req.diagnosis || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      diagnosisSearchText.includes(searchTerm.toLowerCase()) ||
       (normalizedIcdSearch ? normalizedRequestCode.includes(normalizedIcdSearch) : false) ||
       getRequestActionLabel(req).toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -318,9 +273,7 @@ export default function Dashboard() {
     <div className="w-full space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">
-            {isRegistrar || isAdmin ? 'შემოსული მოთხოვნები' : 'ჩემი მოთხოვნები'}
-          </h2>
+          <h2 className="text-2xl font-bold text-slate-900">შემოსული მოთხოვნები</h2>
           <p className="text-slate-500">პაციენტების გადამისამართების მართვა</p>
         </div>
         
@@ -453,22 +406,9 @@ export default function Dashboard() {
               <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl bg-slate-50 p-3">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დიაგნოზი</div>
-                  {(() => {
-                    const diagnosisParts = getDiagnosisDisplayParts(req);
-
-                    return (
-                      <div className="mt-1 space-y-1">
-                        <div className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-black text-slate-900">
-                          {diagnosisParts.code || diagnosisParts.combined}
-                        </div>
-                        {diagnosisParts.description && (
-                          <div className="text-sm text-slate-600">
-                            {diagnosisParts.description}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  <div className="mt-1">
+                    <DiagnosisList request={req} />
+                  </div>
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">მოთხოვნა</div>
@@ -585,22 +525,9 @@ export default function Dashboard() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {(() => {
-                        const diagnosisParts = getDiagnosisDisplayParts(req);
-
-                        return (
-                          <div className="space-y-1">
-                            <div className="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-lg font-black text-slate-900">
-                              {diagnosisParts.code || diagnosisParts.combined}
-                            </div>
-                            {diagnosisParts.description && (
-                              <div className="max-w-xs text-sm leading-5 text-slate-600 whitespace-normal">
-                                {diagnosisParts.description}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
+                      <div className="max-w-xs">
+                        <DiagnosisList request={req} />
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-slate-700">{req.patientData.historyNumber}</div>

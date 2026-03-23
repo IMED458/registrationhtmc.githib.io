@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
-import { getDiagnosisDisplayParts } from '../icd10Utils';
+import { getDiagnosisEntries } from '../icd10Utils';
 import { ClinicalRequest, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User } from 'lucide-react';
@@ -558,19 +558,28 @@ export default function RequestDetailsPage() {
               </div>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                  <div className="text-xs text-slate-400 uppercase font-bold">დიაგნოზი (ICD-10)</div>
-                  {(() => {
-                    const diagnosisParts = getDiagnosisDisplayParts(request);
-
-                    return (
-                      <div className="mt-1 space-y-1">
-                        <div className="font-bold text-slate-900">{diagnosisParts.code || diagnosisParts.combined}</div>
-                        {diagnosisParts.description && (
-                          <div className="text-sm leading-6 text-slate-600">{diagnosisParts.description}</div>
+                  <div className="text-xs text-slate-400 uppercase font-bold">დიაგნოზები (ICD-10)</div>
+                  <div className="mt-1 space-y-3">
+                    {getDiagnosisEntries(request).length > 0 ? getDiagnosisEntries(request).map((diagnosisEntry, index) => (
+                      <div key={`${diagnosisEntry.code || diagnosisEntry.description || 'diagnosis'}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-bold text-slate-900">
+                            {diagnosisEntry.code || diagnosisEntry.combined}
+                          </div>
+                          {diagnosisEntry.isPrimary && (
+                            <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-black text-sky-700">
+                              წამყვანი
+                            </span>
+                          )}
+                        </div>
+                        {diagnosisEntry.description && (
+                          <div className="mt-1 text-sm leading-6 text-slate-600">{diagnosisEntry.description}</div>
                         )}
                       </div>
-                    );
-                  })()}
+                    )) : (
+                      <div className="text-sm text-slate-500">-</div>
+                    )}
+                  </div>
                 </div>
               </div>
               <div>

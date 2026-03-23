@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
-import { getDiagnosisDisplayParts } from '../icd10Utils';
+import { getDiagnosisEntries } from '../icd10Utils';
 import { ClinicalRequest } from '../types';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
@@ -108,23 +108,30 @@ export default function PrintPage() {
 
             <div className="space-y-4">
               <div>
-                <div className="text-[10px] font-black uppercase text-slate-500">დიაგნოზი (ICD-10)</div>
-                {(() => {
-                  const diagnosisParts = getDiagnosisDisplayParts(request);
-
-                  return (
-                    <div className="space-y-1 border-b border-slate-300 pb-1">
-                      <div className="text-lg font-bold">
-                        {diagnosisParts.code || diagnosisParts.combined}
+                <div className="text-[10px] font-black uppercase text-slate-500">დიაგნოზები (ICD-10)</div>
+                <div className="space-y-2 border-b border-slate-300 pb-1">
+                  {getDiagnosisEntries(request).length > 0 ? getDiagnosisEntries(request).map((diagnosisEntry, index) => (
+                    <div key={`${diagnosisEntry.code || diagnosisEntry.description || 'diagnosis'}-${index}`} className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-lg font-bold">
+                          {diagnosisEntry.code || diagnosisEntry.combined}
+                        </div>
+                        {diagnosisEntry.isPrimary && (
+                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black text-sky-700">
+                            წამყვანი
+                          </span>
+                        )}
                       </div>
-                      {diagnosisParts.description && (
+                      {diagnosisEntry.description && (
                         <div className="text-sm font-medium leading-5 text-slate-700">
-                          {diagnosisParts.description}
+                          {diagnosisEntry.description}
                         </div>
                       )}
                     </div>
-                  );
-                })()}
+                  )) : (
+                    <div className="text-lg font-bold">-</div>
+                  )}
+                </div>
               </div>
               <div>
                 <div className="text-[10px] font-black uppercase text-slate-500">მოთხოვნილი კვლევა / მოქმედება</div>

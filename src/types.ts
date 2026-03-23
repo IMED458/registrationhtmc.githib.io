@@ -21,6 +21,12 @@ export interface Patient {
 export type RequestStatus = 'ახალი' | 'განხილვაშია' | 'დადასტურებულია' | 'დასრულებულია' | 'უარყოფილია';
 export type AdminConfirmationStatus = 'pending' | 'confirmed';
 
+export interface DiagnosisEntry {
+  icdCode: string;
+  diagnosis: string;
+  isPrimary?: boolean;
+}
+
 export interface PendingRegistrarUpdate {
   currentStatus: RequestStatus;
   finalDecision?: string;
@@ -53,6 +59,7 @@ export interface ClinicalRequest {
   consentStatus: string;
   diagnosis: string;
   icdCode?: string;
+  diagnoses?: DiagnosisEntry[];
   doctorComment?: string;
   registrarComment?: string;
   registrarName?: string;

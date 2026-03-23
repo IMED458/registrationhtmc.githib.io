@@ -6,12 +6,56 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } from '../icd10Lookup';
-import { normalizeIcdCode } from '../icd10Utils';
+import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { resolveServerApiUrl } from '../serverApi';
-import { ClinicalRequest } from '../types';
+import { ClinicalRequest, DiagnosisEntry } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS } from '../constants';
-import { ArrowLeft, FileText, Loader2, Save, Search, User } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Plus, Save, Search, Trash2, User } from 'lucide-react';
+
+type DiagnosisFormRow = DiagnosisEntry & {
+  id: string;
+};
+
+type ActiveIcdField = {
+  rowId: string;
+  field: 'code' | 'diagnosis';
+} | null;
+
+function createDiagnosisRowId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createDiagnosisRow(overrides: Partial<DiagnosisFormRow> = {}): DiagnosisFormRow {
+  return {
+    id: createDiagnosisRowId(),
+    icdCode: '',
+    diagnosis: '',
+    isPrimary: false,
+    ...overrides,
+  };
+}
+
+function sanitizeDiagnoses(rows: DiagnosisFormRow[]): DiagnosisEntry[] {
+  const sanitizedRows = rows
+    .map((row) => ({
+      icdCode: row.icdCode.trim(),
+      diagnosis: row.diagnosis.trim(),
+      isPrimary: Boolean(row.isPrimary),
+    }))
+    .filter((row) => row.icdCode || row.diagnosis);
+
+  if (sanitizedRows.length === 1) {
+    return [
+      {
+        ...sanitizedRows[0],
+        isPrimary: true,
+      },
+    ];
+  }
+
+  return sanitizedRows;
+}
 
 export default function NewRequestPage() {
   const { profile, isAdmin, isDoctorOrNurse } = useAuth();
@@ -29,7 +73,7 @@ export default function NewRequestPage() {
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
   const [icdSuggestions, setIcdSuggestions] = useState<IcdEntry[]>([]);
-  const [activeIcdField, setActiveIcdField] = useState<'code' | 'diagnosis' | null>(null);
+  const [activeIcdField, setActiveIcdField] = useState<ActiveIcdField>(null);
   const [icdLoading, setIcdLoading] = useState(false);
   const [icdMessage, setIcdMessage] = useState('');
   
@@ -41,8 +85,7 @@ export default function NewRequestPage() {
     birthDate: '',
     phone: '',
     address: '',
-    icdCode: '',
-    diagnosis: '',
+    diagnoses: [createDiagnosisRow({ isPrimary: true })],
     requestedAction: REQUEST_ACTIONS[0],
     department: '',
     studyType: '',
@@ -54,6 +97,8 @@ export default function NewRequestPage() {
   const requiresDiagnosisDescription =
     requiresStructuredFields && formData.requestedAction !== 'კვლევა';
   const resolvedSenderName = formData.senderName.trim() || automaticSenderName;
+  const hasMultipleDiagnoses = formData.diagnoses.length > 1;
+  const hasExplicitPrimaryDiagnosis = formData.diagnoses.some((row) => row.isPrimary);
 
   const filteredDepts = DEPARTMENTS.filter(d => 
     d.toLowerCase().includes(deptSearch.toLowerCase())
@@ -63,7 +108,7 @@ export default function NewRequestPage() {
     void preloadIcdEntries();
   }, []);
 
-  const runIcdSearch = async (query: string, field: 'code' | 'diagnosis') => {
+  const runIcdSearch = async (rowId: string, query: string, field: 'code' | 'diagnosis') => {
     const requestId = icdLookupRequestRef.current + 1;
     icdLookupRequestRef.current = requestId;
 
@@ -77,7 +122,14 @@ export default function NewRequestPage() {
       if (field === 'code') {
         setFormData((prev) => ({
           ...prev,
-          diagnosis: '',
+          diagnoses: prev.diagnoses.map((row) =>
+            row.id === rowId
+              ? {
+                  ...row,
+                  diagnosis: '',
+                }
+              : row,
+          ),
         }));
       }
 
@@ -100,10 +152,17 @@ export default function NewRequestPage() {
         const normalizedCode = normalizeIcdCode(trimmedQuery);
 
         setFormData((prev) =>
-          prev.icdCode === normalizedCode
+          prev.diagnoses.some((row) => row.id === rowId && row.icdCode === normalizedCode)
             ? {
                 ...prev,
-                diagnosis: exactCodeEntry?.name || '',
+                diagnoses: prev.diagnoses.map((row) =>
+                  row.id === rowId
+                    ? {
+                        ...row,
+                        diagnosis: exactCodeEntry?.name || '',
+                      }
+                    : row,
+                ),
               }
             : prev,
         );
@@ -118,7 +177,7 @@ export default function NewRequestPage() {
       }
 
       setIcdSuggestions(suggestions);
-      setActiveIcdField(suggestions.length ? field : null);
+      setActiveIcdField(suggestions.length ? { rowId, field } : null);
     } catch (lookupError) {
       console.error('ICD lookup error:', lookupError);
 
@@ -134,33 +193,54 @@ export default function NewRequestPage() {
     }
   };
 
-  const handleIcdCodeChange = (nextValue: string) => {
+  const handleIcdCodeChange = (rowId: string, nextValue: string) => {
     const normalizedCode = normalizeIcdCode(nextValue);
 
     setFormData((prev) => ({
       ...prev,
-      icdCode: normalizedCode,
-      diagnosis: normalizedCode === prev.icdCode ? prev.diagnosis : '',
+      diagnoses: prev.diagnoses.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              icdCode: normalizedCode,
+              diagnosis: normalizedCode === row.icdCode ? row.diagnosis : '',
+            }
+          : row,
+      ),
     }));
 
-    void runIcdSearch(normalizedCode, 'code');
+    void runIcdSearch(rowId, normalizedCode, 'code');
   };
 
-  const handleDiagnosisChange = (nextValue: string) => {
+  const handleDiagnosisChange = (rowId: string, nextValue: string) => {
     setFormData((prev) => ({
       ...prev,
-      diagnosis: nextValue,
+      diagnoses: prev.diagnoses.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              diagnosis: nextValue,
+            }
+          : row,
+      ),
     }));
 
-    void runIcdSearch(nextValue, 'diagnosis');
+    void runIcdSearch(rowId, nextValue, 'diagnosis');
   };
 
-  const handleIcdSuggestionPick = (entry: IcdEntry) => {
+  const handleIcdSuggestionPick = (rowId: string, entry: IcdEntry) => {
     icdLookupRequestRef.current += 1;
     setFormData((prev) => ({
       ...prev,
-      icdCode: entry.code,
-      diagnosis: entry.name,
+      diagnoses: prev.diagnoses.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              icdCode: entry.code,
+              diagnosis: entry.name,
+            }
+          : row,
+      ),
     }));
     setIcdSuggestions([]);
     setActiveIcdField(null);
@@ -171,6 +251,69 @@ export default function NewRequestPage() {
     window.setTimeout(() => {
       setActiveIcdField(null);
     }, 140);
+  };
+
+  const addDiagnosisRow = () => {
+    setFormData((prev) => ({
+      ...prev,
+      diagnoses: [
+        ...(prev.diagnoses.length === 1
+          ? prev.diagnoses.map((row) => ({
+              ...row,
+              isPrimary: false,
+            }))
+          : prev.diagnoses),
+        createDiagnosisRow(),
+      ],
+    }));
+  };
+
+  const removeDiagnosisRow = (rowId: string) => {
+    setFormData((prev) => {
+      const nextDiagnoses = prev.diagnoses.filter((row) => row.id !== rowId);
+
+      if (nextDiagnoses.length === 0) {
+        return {
+          ...prev,
+          diagnoses: [createDiagnosisRow({ isPrimary: true })],
+        };
+      }
+
+      if (nextDiagnoses.length === 1) {
+        return {
+          ...prev,
+          diagnoses: nextDiagnoses.map((row) => ({
+            ...row,
+            isPrimary: true,
+          })),
+        };
+      }
+
+      return {
+        ...prev,
+        diagnoses: nextDiagnoses,
+      };
+    });
+  };
+
+  const togglePrimaryDiagnosis = (rowId: string) => {
+    setFormData((prev) => {
+      if (prev.diagnoses.length === 1) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        diagnoses: prev.diagnoses.map((row) =>
+          row.id === rowId
+            ? {
+                ...row,
+                isPrimary: !row.isPrimary,
+              }
+            : row,
+        ),
+      };
+    });
   };
 
   const handleLookup = async () => {
@@ -259,9 +402,23 @@ export default function NewRequestPage() {
       return;
     }
 
-    if (requiresDiagnosisDescription && !formData.diagnosis.trim()) {
-      setError('ICD-10 კოდის მიხედვით შეავსეთ დიაგნოზის განმარტება.');
-      return;
+    const diagnoses = sanitizeDiagnoses(formData.diagnoses);
+
+    if (requiresDiagnosisDescription) {
+      if (diagnoses.length === 0) {
+        setError('მიუთითეთ მინიმუმ ერთი დიაგნოზი.');
+        return;
+      }
+
+      if (diagnoses.some((row) => !row.icdCode)) {
+        setError('თითოეულ დიაგნოზზე მიუთითეთ ICD-10 კოდი.');
+        return;
+      }
+
+      if (diagnoses.some((row) => !row.diagnosis)) {
+        setError('ICD-10 კოდის მიხედვით შეავსეთ დიაგნოზის განმარტება.');
+        return;
+      }
     }
     
     setLoading(true);
@@ -273,6 +430,8 @@ export default function NewRequestPage() {
         const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
         settings = settingsSnap.exists() ? settingsSnap.data() : null;
       }
+
+      const representativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses });
 
       const requestData: Omit<ClinicalRequest, 'id'> = {
         patientData: {
@@ -292,8 +451,9 @@ export default function NewRequestPage() {
         department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
         studyType: formData.studyType,
         consentStatus: formData.consentStatus,
-        diagnosis: formData.diagnosis.trim(),
-        icdCode: formData.icdCode,
+        diagnosis: representativeDiagnosis?.diagnosis || '',
+        icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+        diagnoses,
         doctorComment: formData.doctorComment,
         currentStatus: 'ახალი',
         createdAt: Timestamp.now(),
@@ -320,7 +480,7 @@ export default function NewRequestPage() {
             body: JSON.stringify({
               historyNumber: formData.historyNumber,
               personalId: formData.personalId,
-              icdCode: formData.icdCode,
+              icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
               requestedAction: formData.requestedAction,
               department: formData.department,
               consentStatus: formData.consentStatus,
@@ -510,79 +670,138 @@ export default function NewRequestPage() {
           </div>
           
           <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2 relative">
-                <label className="text-sm font-bold text-slate-700">ICD-10 კოდი</label>
-                <input
-                  type="text"
-                  required={requiresStructuredFields}
-                  placeholder="მაგ: R10.4"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.icdCode}
-                  onChange={(e) => handleIcdCodeChange(e.target.value)}
-                  onFocus={() => {
-                    if (formData.icdCode.trim()) {
-                      void runIcdSearch(formData.icdCode, 'code');
-                    }
-                  }}
-                  onBlur={scheduleIcdDropdownClose}
-                />
-                {activeIcdField === 'code' && icdSuggestions.length > 0 && (
-                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-                    {icdSuggestions.map((entry) => (
-                      <button
-                        key={entry.code}
-                        type="button"
-                        className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => handleIcdSuggestionPick(entry)}
-                      >
-                        <span className="min-w-[5rem] text-xs font-black text-emerald-700">{entry.code}</span>
-                        <span className="text-sm text-slate-700">{entry.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <label className="text-sm font-bold text-slate-700">დიაგნოზები (ICD-10)</label>
+                  <p className="mt-1 text-xs text-slate-500">
+                    შეგიძლიათ რამდენიმე დიაგნოზი დაამატოთ. თუ რამდენიმე დიაგნოზზე არცერთი არ მოინიშნა, ყველა წამყვანად ჩაითვლება.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addDiagnosisRow}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  დიაგნოზის დამატება
+                </button>
               </div>
 
-              <div className="space-y-2 relative">
-                <label className="text-sm font-bold text-slate-700">
-                  დიაგნოზის განმარტება
-                  {formData.requestedAction === 'კვლევა' && (
-                    <span className="ml-2 text-xs font-medium text-slate-400">(კვლევის შემთხვევაში არჩევითი)</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  required={requiresDiagnosisDescription}
-                  placeholder="აირჩიეთ ICD-10 კოდი ან მოძებნეთ დიაგნოზით"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.diagnosis}
-                  onChange={(e) => handleDiagnosisChange(e.target.value)}
-                  onFocus={() => {
-                    if (formData.diagnosis.trim()) {
-                      void runIcdSearch(formData.diagnosis, 'diagnosis');
-                    }
-                  }}
-                  onBlur={scheduleIcdDropdownClose}
-                />
-                {activeIcdField === 'diagnosis' && icdSuggestions.length > 0 && (
-                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-                    {icdSuggestions.map((entry) => (
-                      <button
-                        key={`${entry.code}-diagnosis`}
-                        type="button"
-                        className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => handleIcdSuggestionPick(entry)}
-                      >
-                        <span className="min-w-[5rem] text-xs font-black text-emerald-700">{entry.code}</span>
-                        <span className="text-sm text-slate-700">{entry.name}</span>
-                      </button>
-                    ))}
+              {formData.diagnoses.map((diagnosisRow, index) => {
+                const isSingleDiagnosis = formData.diagnoses.length === 1;
+
+                return (
+                  <div key={diagnosisRow.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm font-bold text-slate-700">
+                        დიაგნოზი #{index + 1}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className={`inline-flex items-center gap-2 text-sm font-bold ${isSingleDiagnosis ? 'text-sky-700' : 'text-slate-600'}`}>
+                          <input
+                            type="checkbox"
+                            checked={isSingleDiagnosis ? true : Boolean(diagnosisRow.isPrimary)}
+                            disabled={isSingleDiagnosis}
+                            onChange={() => togglePrimaryDiagnosis(diagnosisRow.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          />
+                          {isSingleDiagnosis ? 'წამყვანი (ავტომატურად)' : 'წამყვანი'}
+                        </label>
+                        {formData.diagnoses.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeDiagnosisRow(diagnosisRow.id)}
+                            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            წაშლა
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      <div className="space-y-2 relative">
+                        <label className="text-sm font-bold text-slate-700">ICD-10 კოდი</label>
+                        <input
+                          type="text"
+                          placeholder="მაგ: R10.4"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                          value={diagnosisRow.icdCode}
+                          onChange={(e) => handleIcdCodeChange(diagnosisRow.id, e.target.value)}
+                          onFocus={() => {
+                            if (diagnosisRow.icdCode.trim()) {
+                              void runIcdSearch(diagnosisRow.id, diagnosisRow.icdCode, 'code');
+                            }
+                          }}
+                          onBlur={scheduleIcdDropdownClose}
+                        />
+                        {activeIcdField?.rowId === diagnosisRow.id && activeIcdField.field === 'code' && icdSuggestions.length > 0 && (
+                          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                            {icdSuggestions.map((entry) => (
+                              <button
+                                key={`${diagnosisRow.id}-${entry.code}`}
+                                type="button"
+                                className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => handleIcdSuggestionPick(diagnosisRow.id, entry)}
+                              >
+                                <span className="min-w-[5rem] text-xs font-black text-emerald-700">{entry.code}</span>
+                                <span className="text-sm text-slate-700">{entry.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 relative">
+                        <label className="text-sm font-bold text-slate-700">
+                          დიაგნოზის განმარტება
+                          {formData.requestedAction === 'კვლევა' && (
+                            <span className="ml-2 text-xs font-medium text-slate-400">(კვლევის შემთხვევაში არჩევითი)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="აირჩიეთ ICD-10 კოდი ან მოძებნეთ დიაგნოზით"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                          value={diagnosisRow.diagnosis}
+                          onChange={(e) => handleDiagnosisChange(diagnosisRow.id, e.target.value)}
+                          onFocus={() => {
+                            if (diagnosisRow.diagnosis.trim()) {
+                              void runIcdSearch(diagnosisRow.id, diagnosisRow.diagnosis, 'diagnosis');
+                            }
+                          }}
+                          onBlur={scheduleIcdDropdownClose}
+                        />
+                        {activeIcdField?.rowId === diagnosisRow.id && activeIcdField.field === 'diagnosis' && icdSuggestions.length > 0 && (
+                          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                            {icdSuggestions.map((entry) => (
+                              <button
+                                key={`${diagnosisRow.id}-${entry.code}-diagnosis`}
+                                type="button"
+                                className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => handleIcdSuggestionPick(diagnosisRow.id, entry)}
+                              >
+                                <span className="min-w-[5rem] text-xs font-black text-emerald-700">{entry.code}</span>
+                                <span className="text-sm text-slate-700">{entry.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+                );
+              })}
+
+              {hasMultipleDiagnoses && !hasExplicitPrimaryDiagnosis && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                  ამ ეტაპზე არცერთი დიაგნოზი არ არის ცალკე მონიშნული, ამიტომ ყველა წამყვან დიაგნოზად ჩაითვლება.
+                </div>
+              )}
             </div>
 
             {(icdLoading || icdMessage) && (
