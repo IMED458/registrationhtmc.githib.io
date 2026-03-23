@@ -1,4 +1,5 @@
 import { FirebaseOptions, getApp, getApps, initializeApp } from 'firebase/app';
+import { Analytics, getAnalytics, isSupported } from 'firebase/analytics';
 import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
@@ -36,3 +37,17 @@ export const db: Firestore | null = app
     ? getFirestore(app, firestoreDatabaseId)
     : getFirestore(app)
   : null;
+
+export let analytics: Analytics | null = null;
+
+if (app && typeof window !== 'undefined') {
+  void isSupported()
+    .then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch((error) => {
+      console.warn('Firebase Analytics initialization skipped:', error);
+    });
+}
