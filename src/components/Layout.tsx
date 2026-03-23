@@ -21,7 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
               <div className="bg-emerald-600 p-2 rounded-lg">
@@ -50,8 +50,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex flex-1 max-w-7xl mx-auto w-full">
-        <aside className="w-64 border-r border-slate-200 bg-white hidden md:block p-4 space-y-2">
+      <div className="flex flex-1 w-full min-h-0">
+        <aside className="hidden md:block md:w-72 md:shrink-0 md:border-r md:border-slate-200 md:bg-white md:p-4 md:space-y-2 md:sticky md:top-16 md:h-[calc(100vh-4rem)]">
           <nav className="space-y-1">
             <Link
               to="/"
@@ -83,7 +83,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </aside>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+        <main className="flex-1 min-w-0 overflow-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>

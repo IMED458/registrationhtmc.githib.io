@@ -170,7 +170,7 @@ export default function NewRequestPage() {
 
   if (profile && !canCreateRequests) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6 pb-12">
+      <div className="w-full max-w-none space-y-6 pb-12">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
@@ -199,7 +199,7 @@ export default function NewRequestPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="w-full max-w-none space-y-6 pb-12">
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate(-1)}

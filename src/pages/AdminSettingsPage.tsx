@@ -71,7 +71,7 @@ export default function AdminSettingsPage() {
   if (!isAdmin) return <div className="text-center p-12 text-red-500 font-bold">წვდომა აკრძალულია</div>;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+    <div className="w-full max-w-none space-y-8 pb-12">
       <div>
         <h2 className="text-2xl font-bold text-slate-900">ადმინისტრირება</h2>
         <p className="text-slate-500">სისტემის პარამეტრები და აუდიტი</p>

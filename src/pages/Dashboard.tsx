@@ -80,7 +80,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">
@@ -139,7 +139,7 @@ export default function Dashboard() {
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ისტორია / პირადი №</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">მოთხოვნა</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">გამომგზავნი</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">სტატუსი</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">სტატუსი / საბოლოო გადაწყვეტილება</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">თარიღი</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">მოქმედება</th>
               </tr>
@@ -147,13 +147,13 @@ export default function Dashboard() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                     იტვირთება მონაცემები...
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                     ჩანაწერები არ მოიძებნა
                   </td>
                 </tr>
@@ -180,13 +180,20 @@ export default function Dashboard() {
                       <div className="text-sm text-slate-600">{req.createdByUserName}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border",
-                        getStatusColor(req.currentStatus)
-                      )}>
-                        {getStatusIcon(req.currentStatus)}
-                        {req.currentStatus}
-                      </span>
+                      <div className="space-y-2">
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border",
+                          getStatusColor(req.currentStatus)
+                        )}>
+                          {getStatusIcon(req.currentStatus)}
+                          {req.currentStatus}
+                        </span>
+                        {req.finalDecision && (
+                          <div className="max-w-xs text-sm font-medium leading-5 text-slate-700 whitespace-normal">
+                            {req.finalDecision}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-slate-600">
