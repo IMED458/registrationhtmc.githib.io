@@ -5,7 +5,7 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
-import { getDiagnosisDisplayParts } from '../icd10Utils';
+import { getDiagnosisDisplayParts, normalizeIcdCode } from '../icd10Utils';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
 import { CheckCircle2, Clock, Filter, Loader2, MoreHorizontal, Plus, Printer, Search, Trash2, XCircle } from 'lucide-react';
@@ -153,12 +153,15 @@ export default function Dashboard() {
   }, [profile, isDoctorOrNurse, isAdmin]);
 
   const filteredRequests = requests.filter(req => {
+    const normalizedIcdSearch = normalizeIcdCode(searchTerm);
+    const normalizedRequestCode = normalizeIcdCode(req.icdCode || req.diagnosis || '');
     const matchesSearch = 
       req.patientData.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.patientData.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.patientData.historyNumber.includes(searchTerm) ||
       req.patientData.personalId.includes(searchTerm) ||
       (req.icdCode || req.diagnosis || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (normalizedIcdSearch ? normalizedRequestCode.includes(normalizedIcdSearch) : false) ||
       getRequestActionLabel(req).toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'ყველა' || req.currentStatus === statusFilter;
