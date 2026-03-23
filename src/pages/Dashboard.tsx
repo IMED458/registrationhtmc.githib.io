@@ -73,32 +73,6 @@ function hasDoctorEditPendingApproval(request: ClinicalRequest) {
   return Boolean(request.pendingDoctorEdit && request.adminConfirmationStatus === 'pending');
 }
 
-function hasAnyEdit(request: ClinicalRequest) {
-  return Boolean(request.lastRegistrarEditAt || request.lastDoctorEditAt);
-}
-
-function getRegistrarEditLabel(request: ClinicalRequest) {
-  if (!hasAnyEdit(request)) {
-    return '';
-  }
-
-  if (hasDoctorEditPendingApproval(request)) {
-    return 'ექიმმა დაარედაქტირა / ადმინის დადასტურება ელოდება';
-  }
-
-  if (request.lastDoctorEditAt && !request.lastRegistrarEditAt) {
-    return request.adminConfirmationStatus === 'confirmed'
-      ? 'ექიმმა დაარედაქტირა / ადმინმა დაადასტურა'
-      : 'ექიმმა დაარედაქტირა';
-  }
-
-  return request.adminConfirmationStatus === 'pending'
-    ? 'რედაქტირდა / ადმინის დადასტურება ელოდება'
-    : request.adminConfirmationStatus === 'confirmed'
-      ? 'რედაქტირდა / ადმინმა დაადასტურა'
-      : 'რედაქტირდა';
-}
-
 function needsRegistrarRework(request: ClinicalRequest) {
   return Boolean(request.requiresRegistrarAction && request.pendingDoctorEdit);
 }
@@ -107,14 +81,6 @@ function getPatientNameTextClass(request: ClinicalRequest) {
   return needsRegistrarRework(request) || hasDoctorEditPendingApproval(request)
     ? 'text-sky-600'
     : 'text-slate-900';
-}
-
-function getRegistrarEditTextClass(request: ClinicalRequest) {
-  return request.adminConfirmationStatus === 'pending'
-    ? 'text-amber-700'
-    : request.adminConfirmationStatus === 'confirmed'
-      ? 'text-emerald-700'
-      : 'text-slate-500';
 }
 
 function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
@@ -462,14 +428,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                {hasAnyEdit(req) && (
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">რედაქტირების სტატუსი</div>
-                    <div className={`mt-1 text-sm font-bold ${getRegistrarEditTextClass(req)}`}>
-                      {getRegistrarEditLabel(req)}
-                    </div>
-                  </div>
-                )}
                 {needsRegistrarRework(req) && (
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wide text-sky-600">ახალი ცვლილება</div>
@@ -581,11 +539,6 @@ export default function Dashboard() {
                         {req.finalDecision && (
                           <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
                             {req.finalDecision}
-                          </div>
-                        )}
-                        {hasAnyEdit(req) && (
-                          <div className={`max-w-xs text-sm font-bold leading-5 whitespace-normal ${getRegistrarEditTextClass(req)}`}>
-                            {getRegistrarEditLabel(req)}
                           </div>
                         )}
                         {needsRegistrarRework(req) && (
