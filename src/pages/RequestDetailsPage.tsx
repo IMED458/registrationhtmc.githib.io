@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { writeAuditLogEntry } from '../auditLog';
+import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { ClinicalRequest } from '../types';
-import { REQUEST_STATUSES, FINAL_DECISIONS } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
@@ -82,23 +83,27 @@ export default function RequestDetailsPage() {
       };
 
       await updateDoc(doc(db, 'requests', id), updateData);
-      
-      // Audit Log
-      await addDoc(collection(db, 'audit_logs'), {
+
+      await writeAuditLogEntry({
         userId: profile.uid,
         userName: profile.fullName,
         requestId: id,
         actionType: 'UPDATE',
         oldValue: request.currentStatus,
         newValue: `${formData.currentStatus}${formData.finalDecision ? ` / ${formData.finalDecision}` : ''}`,
-        createdAt: Timestamp.now()
       });
 
       setRequest({ ...request, ...updateData });
       alert("სტატუსი განახლდა წარმატებით");
     } catch (err) {
       console.error("Update error:", err);
-      alert("განახლება ვერ მოხერხდა.");
+      alert(
+        getFirebaseActionErrorMessage(err, {
+          fallback: 'განახლება ვერ მოხერხდა.',
+          permissionDenied:
+            'სტატუსის განახლება ვერ მოხერხდა, რადგან ამ ანგარიშისთვის Firestore write წვდომა არ არის ნებადართული.',
+        }),
+      );
     } finally {
       setUpdating(false);
     }

@@ -3,18 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { writeAuditLogEntry } from '../auditLog';
+import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { ClinicalRequest } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS } from '../constants';
 import { ArrowLeft, FileText, Loader2, Save, Search, User } from 'lucide-react';
 
 export default function NewRequestPage() {
-  const { profile } = useAuth();
+  const { profile, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [lookupMessage, setLookupMessage] = useState('');
+  const canCreateRequests = isAdmin || isDoctorOrNurse;
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
@@ -98,6 +101,10 @@ export default function NewRequestPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+    if (!canCreateRequests) {
+      setError('ახალი მოთხოვნის შექმნა შეუძლიათ მხოლოდ ექიმს/ექთანს ან ადმინისტრატორს.');
+      return;
+    }
 
     if (formData.requestedAction === 'სტაციონარი' && !formData.department.trim()) {
       setError('სტაციონარის მოთხოვნისთვის განყოფილება სავალდებულოა.');
@@ -137,24 +144,59 @@ export default function NewRequestPage() {
       };
 
       const docRef = await addDoc(collection(db, 'requests'), requestData);
-      
-      await addDoc(collection(db, 'audit_logs'), {
+
+      await writeAuditLogEntry({
         userId: profile.uid,
         userName: profile.fullName,
         requestId: docRef.id,
         actionType: 'CREATE',
         newValue: 'ახალი მოთხოვნა შეიქმნა',
-        createdAt: Timestamp.now()
       });
 
       navigate('/');
     } catch (err) {
       console.error("Submit error:", err);
-      setError("მოთხოვნის გაგზავნა ვერ მოხერხდა.");
+      setError(
+        getFirebaseActionErrorMessage(err, {
+          fallback: 'მოთხოვნის გაგზავნა ვერ მოხერხდა.',
+          permissionDenied:
+            'ამ ანგარიშით მოთხოვნის გაგზავნა ვერ მოხერხდა, რადგან Firestore-ში write წვდომა არ არის ნებადართული.',
+        }),
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  if (profile && !canCreateRequests) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 pb-12">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6 text-slate-500" />
+          </button>
+          <h2 className="text-2xl font-bold text-slate-900">ახალი მოთხოვნის შექმნა</h2>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-6 space-y-3">
+          <h3 className="text-lg font-bold text-slate-900">წვდომა შეზღუდულია</h3>
+          <p className="text-slate-600">
+            ახალი მოთხოვნის შექმნა შეუძლიათ მხოლოდ ექიმს/ექთანს ან ადმინისტრატორს.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold"
+          >
+            მთავარ გვერდზე დაბრუნება
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">

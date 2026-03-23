@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { addDoc, collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { writeAuditLogEntry } from '../auditLog';
 import { DEFAULT_SYSTEM_SETTINGS } from '../defaultSystemSettings';
+import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { SystemSettings, AuditLog } from '../types';
 import { CheckCircle2, Database, History, Loader2, Save } from 'lucide-react';
 import { format } from 'date-fns';
@@ -41,13 +43,12 @@ export default function AdminSettingsPage() {
       await setDoc(doc(db, 'settings', 'global'), settings);
 
       if (profile) {
-        await addDoc(collection(db, 'audit_logs'), {
+        await writeAuditLogEntry({
           userId: profile.uid,
           userName: profile.fullName,
           requestId: 'settings/global',
           actionType: 'SETTINGS_UPDATE',
           newValue: 'ადმინისტრატორმა განაახლა სისტემის პარამეტრები',
-          createdAt: Timestamp.now(),
         });
       }
 
@@ -55,7 +56,13 @@ export default function AdminSettingsPage() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error(err);
-      alert("შენახვა ვერ მოხერხდა");
+      alert(
+        getFirebaseActionErrorMessage(err, {
+          fallback: 'შენახვა ვერ მოხერხდა.',
+          permissionDenied:
+            'პარამეტრების შენახვა ვერ მოხერხდა, რადგან ამ ანგარიშისთვის ადმინისტრატორის write წვდომა არ არის ნებადართული.',
+        }),
+      );
     } finally {
       setSaving(false);
     }
