@@ -47,7 +47,20 @@ service cloud.firestore {
       );
     }
 
-    function registrarDirectEditFieldsOnly() {
+    function registrarCommentRequired() {
+      return resource.data.lastRegistrarEditAt != null;
+    }
+
+    function registrarCanMarkInReview() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "currentStatus",
+        "updatedAt"
+      ]) &&
+        resource.data.currentStatus == "ახალი" &&
+        request.resource.data.currentStatus == "განხილვაშია";
+    }
+
+    function registrarEditFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         "currentStatus",
         "finalDecision",
@@ -69,29 +82,39 @@ service cloud.firestore {
       ]);
     }
 
-    function registrarDirectEditPayloadIsValid() {
+    function registrarEditCommentIsValid() {
       return request.resource.data.registrarComment is string &&
         (
-          !('lastRegistrarEditAt' in resource.data) ||
-          resource.data.lastRegistrarEditAt == null ||
+          !registrarCommentRequired() ||
           request.resource.data.registrarComment.size() > 0
-        ) &&
-        request.resource.data.lastRegistrarEditByUserId == request.auth.uid &&
-        request.resource.data.lastRegistrarEditByUserEmail == userEmail() &&
-        request.resource.data.adminConfirmationStatus == "pending" &&
-        request.resource.data.pendingRegistrarUpdate != null &&
-        request.resource.data.pendingRegistrarUpdate.currentStatus != null &&
-        request.resource.data.pendingRegistrarUpdate.registrarComment is string &&
-        (
-          !('lastRegistrarEditAt' in resource.data) ||
-          resource.data.lastRegistrarEditAt == null ||
-          request.resource.data.pendingRegistrarUpdate.registrarComment.size() > 0
-        ) &&
-        request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
-        request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
+        );
     }
 
-    function doctorDirectEditFieldsOnly() {
+    function pendingRegistrarUpdateIsValid() {
+      return request.resource.data.pendingRegistrarUpdate != null &&
+        request.resource.data.pendingRegistrarUpdate.currentStatus == request.resource.data.currentStatus &&
+        request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
+        request.resource.data.pendingRegistrarUpdate.requestedByUserName is string &&
+        request.resource.data.pendingRegistrarUpdate.registrarComment is string &&
+        (
+          !registrarCommentRequired() ||
+          request.resource.data.pendingRegistrarUpdate.registrarComment.size() > 0
+        );
+    }
+
+    function registrarUpdateValid() {
+      return registrarEditFieldsOnly() &&
+        registrarEditCommentIsValid() &&
+        pendingRegistrarUpdateIsValid() &&
+        request.resource.data.lastRegistrarEditByUserId == request.auth.uid &&
+        request.resource.data.lastRegistrarEditByUserName is string &&
+        request.resource.data.lastRegistrarEditByUserEmail == userEmail() &&
+        request.resource.data.adminConfirmationStatus == "pending" &&
+        request.resource.data.requiresRegistrarAction == false &&
+        request.resource.data.pendingDoctorEdit == null;
+    }
+
+    function doctorEditFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         "patientData",
         "diagnosis",
@@ -112,42 +135,28 @@ service cloud.firestore {
       ]);
     }
 
-    function doctorDirectEditPayloadIsValid() {
-      return request.resource.data.requiresRegistrarAction == false &&
+    function doctorUpdateValid() {
+      return isRequestOwner() &&
+        doctorEditFieldsOnly() &&
         request.resource.data.patientData != null &&
         request.resource.data.lastDoctorEditComment is string &&
         request.resource.data.lastDoctorEditComment.size() > 0 &&
         request.resource.data.lastDoctorEditByUserId == request.auth.uid &&
+        request.resource.data.lastDoctorEditByUserName is string &&
         request.resource.data.lastDoctorEditByUserEmail == userEmail() &&
-        request.resource.data.adminConfirmationStatus == "pending" &&
         request.resource.data.pendingDoctorEdit != null &&
         request.resource.data.pendingDoctorEdit.comment is string &&
         request.resource.data.pendingDoctorEdit.comment.size() > 0 &&
         request.resource.data.pendingDoctorEdit.editedByUserId == request.auth.uid &&
-        request.resource.data.pendingDoctorEdit.editedByUserEmail == userEmail();
-    }
-
-    function registrarPendingUpdatePayloadIsValid() {
-      return request.resource.data.pendingRegistrarUpdate != null &&
-        request.resource.data.pendingRegistrarUpdate.currentStatus != null &&
-        request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
-        request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
-    }
-
-    function registrarCanMarkInReview() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        "currentStatus",
-        "updatedAt"
-      ]) &&
-        resource.data.currentStatus == "ახალი" &&
-        request.resource.data.currentStatus == "განხილვაშია";
+        request.resource.data.pendingDoctorEdit.editedByUserName is string &&
+        request.resource.data.pendingDoctorEdit.editedByUserEmail == userEmail() &&
+        request.resource.data.adminConfirmationStatus == "pending" &&
+        request.resource.data.requiresRegistrarAction == false;
     }
 
     match /users/{userId} {
       allow read: if isAllowedUser();
-
-      allow create, update: if isAllowedUser() &&
-        request.auth.uid == userId;
+      allow create, update: if isAllowedUser() && request.auth.uid == userId;
     }
 
     match /requests/{requestId} {
@@ -162,17 +171,12 @@ service cloud.firestore {
           isRegistrar() &&
           (
             registrarCanMarkInReview() ||
-            (
-              registrarDirectEditFieldsOnly() &&
-              registrarDirectEditPayloadIsValid()
-            )
+            registrarUpdateValid()
           )
         ) ||
         (
           isDoctor() &&
-          isRequestOwner() &&
-          doctorDirectEditFieldsOnly() &&
-          doctorDirectEditPayloadIsValid()
+          doctorUpdateValid()
         );
 
       allow delete: if isAdmin();
