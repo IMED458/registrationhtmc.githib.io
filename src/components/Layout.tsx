@@ -1,19 +1,29 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { getRoleLabel } from '../accessControl';
 import { useAuth } from '../AuthContext';
 import { auth } from '../firebase';
-import { ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
+
+const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
+  });
 
   const navItemClassName = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 rounded-lg px-3 py-2 font-medium transition-colors ${
+    `flex items-center rounded-lg px-3 py-2 font-medium transition-colors ${
       isActive
         ? 'bg-emerald-50 text-emerald-700'
         : 'text-slate-700 hover:bg-slate-100'
-    }`;
+    } ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`;
 
   const mobileNavItemClassName = ({ isActive }: { isActive: boolean }) =>
     `flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-center transition-colors ${
@@ -21,6 +31,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ? 'bg-emerald-50 text-emerald-700'
         : 'text-slate-500 hover:bg-slate-100'
     }`;
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((current) => {
+      const nextValue = !current;
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(SIDEBAR_STORAGE_KEY, nextValue ? '1' : '0');
+      }
+
+      return nextValue;
+    });
+  };
 
   const handleLogout = async () => {
     if (!auth) {
@@ -75,23 +97,50 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="flex flex-1 w-full min-h-0">
-        <aside className="hidden md:block md:w-72 md:shrink-0 md:border-r md:border-slate-200 md:bg-white md:p-4 md:space-y-2 md:sticky md:top-16 md:h-[calc(100vh-4rem)]">
+        <aside
+          className={`hidden border-r border-slate-200 bg-white p-3 transition-all duration-200 md:sticky md:top-16 md:block md:h-[calc(100vh-4rem)] md:shrink-0 ${
+            isSidebarCollapsed ? 'md:w-20' : 'md:w-60'
+          }`}
+        >
+          <div className={`mb-4 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
+            {!isSidebarCollapsed && (
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-wide text-slate-400">
+                  ნავიგაცია
+                </div>
+                <div className="text-sm font-semibold text-slate-700">
+                  მთავარი მენიუ
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+              title={isSidebarCollapsed ? 'პანელის გაშლა' : 'პანელის შეკეცვა'}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            </button>
+          </div>
+
           <nav className="space-y-1">
             <NavLink
               to="/"
               className={navItemClassName}
+              title="მთავარი პანელი"
             >
               <LayoutDashboard className="w-5 h-5 text-slate-400" />
-              მთავარი პანელი
+              {!isSidebarCollapsed && 'მთავარი პანელი'}
             </NavLink>
             
             {(isDoctorOrNurse || isAdmin) && (
               <NavLink
                 to="/new-request"
                 className={navItemClassName}
+                title="ახალი მოთხოვნა"
               >
                 <FilePlus className="w-5 h-5 text-slate-400" />
-                ახალი მოთხოვნა
+                {!isSidebarCollapsed && 'ახალი მოთხოვნა'}
               </NavLink>
             )}
 
@@ -99,9 +148,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <NavLink
                 to="/settings"
                 className={navItemClassName}
+                title="პარამეტრები"
               >
                 <Settings className="w-5 h-5 text-slate-400" />
-                პარამეტრები
+                {!isSidebarCollapsed && 'პარამეტრები'}
               </NavLink>
             )}
           </nav>
