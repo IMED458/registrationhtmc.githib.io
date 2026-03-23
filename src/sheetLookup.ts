@@ -3,7 +3,7 @@ import { SystemSettings } from './types';
 
 type WorkbookRow = Record<string, unknown>;
 
-let workbookRowsPromise: Promise<WorkbookRow[]> | null = null;
+const workbookRowsPromiseByKey = new Map<string, Promise<WorkbookRow[]>>();
 
 function extractSpreadsheetId(value: string) {
   const trimmedValue = value.trim();
@@ -50,11 +50,16 @@ function normalizeCellValue(value: unknown) {
 }
 
 async function fetchWorkbookRows(settings: SystemSettings) {
+  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
+  const sheetName = settings.sheetName?.trim() || DEFAULT_SYSTEM_SETTINGS.sheetName;
+  const cacheKey = `${spreadsheetId}::${sheetName}`;
+
+  let workbookRowsPromise = workbookRowsPromiseByKey.get(cacheKey);
+
   if (!workbookRowsPromise) {
     workbookRowsPromise = (async () => {
-      const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
       const workbookUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
-      const response = await fetch(workbookUrl);
+      const response = await fetch(workbookUrl, { cache: 'no-store' });
 
       if (!response.ok) {
         throw new Error(`Workbook fetch failed with status ${response.status}`);
@@ -63,7 +68,6 @@ async function fetchWorkbookRows(settings: SystemSettings) {
       const buffer = await response.arrayBuffer();
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheetName = settings.sheetName?.trim() || DEFAULT_SYSTEM_SETTINGS.sheetName;
 
       if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
         throw new Error(`Sheet not found: ${sheetName || 'unknown'}`);
@@ -74,7 +78,12 @@ async function fetchWorkbookRows(settings: SystemSettings) {
         defval: '',
         raw: false,
       });
-    })();
+    })().catch((error) => {
+      workbookRowsPromiseByKey.delete(cacheKey);
+      throw error;
+    });
+
+    workbookRowsPromiseByKey.set(cacheKey, workbookRowsPromise);
   }
 
   return workbookRowsPromise;
