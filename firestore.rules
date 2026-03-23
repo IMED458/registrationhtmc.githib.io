@@ -11,19 +11,14 @@ service cloud.firestore {
         : "";
     }
 
-    function isVerifiedGoogleUser() {
-      return isSignedIn() &&
-        request.auth.token.email_verified == true;
-    }
-
-    function isPasswordUser() {
-      return isSignedIn() &&
-        request.auth.token.firebase != null &&
-        request.auth.token.firebase.sign_in_provider == "password";
-    }
-
     function isAllowedProvider() {
-      return isVerifiedGoogleUser() || isPasswordUser();
+      return isSignedIn() && (
+        request.auth.token.email_verified == true ||
+        (
+          request.auth.token.firebase != null &&
+          request.auth.token.firebase.sign_in_provider == "password"
+        )
+      );
     }
 
     function isAdmin() {
@@ -45,64 +40,36 @@ service cloud.firestore {
       return isAdmin() || isDoctor() || isRegistrar();
     }
 
-    function isOwner() {
+    function isRequestOwner() {
       return isSignedIn() && (
         resource.data.createdByUserId == request.auth.uid ||
         resource.data.createdByUserEmail == userEmail()
       );
     }
 
-    function isNewOwner() {
-      return isSignedIn() &&
-        request.resource.data.createdByUserId == request.auth.uid &&
-        request.resource.data.createdByUserEmail == userEmail();
-    }
-
-    function ownRole() {
-      return isAdmin() ? "admin" :
-        isDoctor() ? "doctor" :
-        isRegistrar() ? "registrar" :
-        "";
-    }
-
     match /users/{userId} {
-      allow read: if isAllowedUser() &&
-        (isAdmin() || request.auth.uid == userId);
+      allow read: if isAllowedUser();
 
-      allow create: if isAllowedUser() &&
-        request.auth.uid == userId &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.email == userEmail() &&
-        request.resource.data.role == ownRole();
-
-      allow update: if isAllowedUser() &&
-        (
-          isAdmin() ||
-          (
-            request.auth.uid == userId &&
-            request.resource.data.uid == request.auth.uid &&
-            request.resource.data.email == userEmail() &&
-            request.resource.data.role == ownRole()
-          )
-        );
+      allow create, update: if isAllowedUser() &&
+        request.auth.uid == userId;
     }
 
     match /requests/{requestId} {
-      allow read: if isAllowedUser() &&
-        (isAdmin() || isRegistrar() || isOwner());
+      allow read: if isAllowedUser();
 
-      allow create: if isAllowedUser() &&
-        (isAdmin() || isDoctor()) &&
-        isNewOwner();
+      allow create: if (isAdmin() || isDoctor()) &&
+        request.resource.data.createdByUserId == request.auth.uid &&
+        request.resource.data.createdByUserEmail == userEmail();
 
-      allow update: if isAllowedUser() &&
+      allow update: if isAdmin() ||
+        isRegistrar() ||
         (
-          isAdmin() ||
-          isRegistrar() ||
-          (isDoctor() && isOwner() && resource.data.currentStatus == "ახალი")
+          isDoctor() &&
+          isRequestOwner() &&
+          resource.data.currentStatus == "ახალი"
         );
 
-      allow delete: if isAllowedUser() && isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /audit_logs/{logId} {
@@ -112,7 +79,7 @@ service cloud.firestore {
 
     match /settings/{settingId} {
       allow read: if isAllowedUser();
-      allow write: if isAllowedUser() && isAdmin();
+      allow write: if isAdmin();
     }
   }
 }
