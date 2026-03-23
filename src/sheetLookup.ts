@@ -1,9 +1,12 @@
 import { DEFAULT_SYSTEM_SETTINGS } from './defaultSystemSettings';
 import { SystemSettings } from './types';
 
-type WorkbookRow = Record<string, unknown>;
+type WorkbookSheetRows = {
+  rows: string[][];
+  sheetName: string;
+};
 
-const workbookRowsPromiseByKey = new Map<string, Promise<WorkbookRow[]>>();
+const workbookSheetsPromiseByKey = new Map<string, Promise<WorkbookSheetRows[]>>();
 
 function extractSpreadsheetId(value: string) {
   const trimmedValue = value.trim();
@@ -13,7 +16,7 @@ function extractSpreadsheetId(value: string) {
 }
 
 function normalizeSettings(input?: Partial<SystemSettings> | null): SystemSettings {
-  const mergedSettings: SystemSettings = {
+  return {
     ...DEFAULT_SYSTEM_SETTINGS,
     ...input,
     columnMapping: {
@@ -21,20 +24,6 @@ function normalizeSettings(input?: Partial<SystemSettings> | null): SystemSettin
       ...(input?.columnMapping || {}),
     },
   };
-
-  const spreadsheetId = extractSpreadsheetId(mergedSettings.googleSheetsId);
-  const defaultSpreadsheetId = extractSpreadsheetId(DEFAULT_SYSTEM_SETTINGS.googleSheetsId);
-
-  if (spreadsheetId === defaultSpreadsheetId) {
-    return {
-      ...mergedSettings,
-      sheetName: DEFAULT_SYSTEM_SETTINGS.sheetName,
-      sheetGid: DEFAULT_SYSTEM_SETTINGS.sheetGid,
-      columnMapping: { ...DEFAULT_SYSTEM_SETTINGS.columnMapping },
-    };
-  }
-
-  return mergedSettings;
 }
 
 function normalizeCellValue(value: unknown) {
@@ -49,63 +38,55 @@ function normalizeCellValue(value: unknown) {
   return String(value).trim().replace(/\.0+$/, '');
 }
 
-async function fetchWorkbookRows(settings: SystemSettings) {
-  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
-  const sheetName = settings.sheetName?.trim() || DEFAULT_SYSTEM_SETTINGS.sheetName;
-  const cacheKey = `${spreadsheetId}::${sheetName}`;
+function columnLetterToIndex(columnName: string) {
+  const normalizedColumnName = columnName.trim().toUpperCase();
 
-  let workbookRowsPromise = workbookRowsPromiseByKey.get(cacheKey);
-
-  if (!workbookRowsPromise) {
-    workbookRowsPromise = (async () => {
-      const workbookUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
-      const response = await fetch(workbookUrl, { cache: 'no-store' });
-
-      if (!response.ok) {
-        throw new Error(`Workbook fetch failed with status ${response.status}`);
-      }
-
-      const buffer = await response.arrayBuffer();
-      const XLSX = await import('xlsx');
-      const workbook = XLSX.read(buffer, { type: 'array' });
-
-      if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
-        throw new Error(`Sheet not found: ${sheetName || 'unknown'}`);
-      }
-
-      return XLSX.utils.sheet_to_json<WorkbookRow>(workbook.Sheets[sheetName], {
-        header: 'A',
-        defval: '',
-        raw: false,
-      });
-    })().catch((error) => {
-      workbookRowsPromiseByKey.delete(cacheKey);
-      throw error;
-    });
-
-    workbookRowsPromiseByKey.set(cacheKey, workbookRowsPromise);
+  if (!/^[A-Z]+$/.test(normalizedColumnName)) {
+    return -1;
   }
 
-  return workbookRowsPromise;
+  let index = 0;
+
+  for (const character of normalizedColumnName) {
+    index = index * 26 + (character.charCodeAt(0) - 64);
+  }
+
+  return index - 1;
 }
 
-export async function lookupPatientFromSheet(
-  input: Partial<SystemSettings> | null | undefined,
+function prioritizeSheetNames(sheetNames: string[], preferredSheetName?: string) {
+  const normalizedPreferredSheetName = preferredSheetName?.trim();
+
+  if (!normalizedPreferredSheetName || !sheetNames.includes(normalizedPreferredSheetName)) {
+    return sheetNames;
+  }
+
+  return [
+    normalizedPreferredSheetName,
+    ...sheetNames.filter((sheetName) => sheetName !== normalizedPreferredSheetName),
+  ];
+}
+
+function mapPatientFromRows(
+  rows: string[][],
+  settings: SystemSettings,
   historyNumber: string,
   personalId: string,
 ) {
-  const settings = normalizeSettings(input);
-  const rows = await fetchWorkbookRows(settings);
-  const firstNameColumn = settings.columnMapping.firstName || 'C';
-  const lastNameColumn = settings.columnMapping.lastName || 'B';
-  const historyNumberColumn = settings.columnMapping.historyNumber || 'F';
-  const personalIdColumn = settings.columnMapping.personalId || 'D';
+  if (!rows.length) {
+    return null;
+  }
+
+  const firstNameIndex = columnLetterToIndex(settings.columnMapping.firstName || 'C');
+  const lastNameIndex = columnLetterToIndex(settings.columnMapping.lastName || 'B');
+  const historyNumberIndex = columnLetterToIndex(settings.columnMapping.historyNumber || 'F');
+  const personalIdIndex = columnLetterToIndex(settings.columnMapping.personalId || 'D');
   const normalizedHistoryNumber = historyNumber.trim();
   const normalizedPersonalId = personalId.trim();
 
   const row = rows.find((currentRow) => {
-    const rowHistoryNumber = normalizeCellValue(currentRow[historyNumberColumn]);
-    const rowPersonalId = normalizeCellValue(currentRow[personalIdColumn]);
+    const rowHistoryNumber = normalizeCellValue(currentRow[historyNumberIndex]);
+    const rowPersonalId = normalizeCellValue(currentRow[personalIdIndex]);
 
     return (
       (normalizedHistoryNumber && rowHistoryNumber === normalizedHistoryNumber) ||
@@ -118,12 +99,71 @@ export async function lookupPatientFromSheet(
   }
 
   return {
-    firstName: normalizeCellValue(row[firstNameColumn]),
-    lastName: normalizeCellValue(row[lastNameColumn]),
-    historyNumber: normalizeCellValue(row[historyNumberColumn]),
-    personalId: normalizeCellValue(row[personalIdColumn]),
+    firstName: normalizeCellValue(row[firstNameIndex]),
+    lastName: normalizeCellValue(row[lastNameIndex]),
+    historyNumber: normalizeCellValue(row[historyNumberIndex]),
+    personalId: normalizeCellValue(row[personalIdIndex]),
     birthDate: '',
     phone: '',
     address: '',
   };
+}
+
+async function fetchWorkbookSheets(settings: SystemSettings) {
+  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
+  const preferredSheetName = settings.sheetName?.trim() || '';
+  const cacheKey = `${spreadsheetId}::${preferredSheetName || '*'}`;
+
+  let workbookSheetsPromise = workbookSheetsPromiseByKey.get(cacheKey);
+
+  if (!workbookSheetsPromise) {
+    workbookSheetsPromise = (async () => {
+      const workbookUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+      const response = await fetch(workbookUrl, { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`Workbook fetch failed with status ${response.status}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const orderedSheetNames = prioritizeSheetNames(workbook.SheetNames, preferredSheetName);
+
+      return orderedSheetNames.map((sheetName) => ({
+        sheetName,
+        rows: XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[sheetName], {
+          header: 1,
+          defval: '',
+          raw: false,
+        }) as string[][],
+      }));
+    })().catch((error) => {
+      workbookSheetsPromiseByKey.delete(cacheKey);
+      throw error;
+    });
+
+    workbookSheetsPromiseByKey.set(cacheKey, workbookSheetsPromise);
+  }
+
+  return workbookSheetsPromise;
+}
+
+export async function lookupPatientFromSheet(
+  input: Partial<SystemSettings> | null | undefined,
+  historyNumber: string,
+  personalId: string,
+) {
+  const settings = normalizeSettings(input);
+  const workbookSheets = await fetchWorkbookSheets(settings);
+
+  for (const sheet of workbookSheets) {
+    const patient = mapPatientFromRows(sheet.rows, settings, historyNumber, personalId);
+
+    if (patient) {
+      return patient;
+    }
+  }
+
+  return null;
 }

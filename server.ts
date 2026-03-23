@@ -12,6 +12,11 @@ import { SystemSettings } from "./src/types";
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
+type WorkbookSheetRows = {
+  rows: string[][];
+  sheetName: string;
+};
+
 function getGoogleAuthClient() {
   const scopes = ["https://www.googleapis.com/auth/spreadsheets"];
   const inlineCredentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -27,7 +32,7 @@ function getGoogleAuthClient() {
 }
 
 function mergeSystemSettings(input: Partial<SystemSettings> | null | undefined): SystemSettings {
-  const mergedSettings: SystemSettings = {
+  return {
     ...DEFAULT_SYSTEM_SETTINGS,
     ...input,
     columnMapping: {
@@ -35,20 +40,6 @@ function mergeSystemSettings(input: Partial<SystemSettings> | null | undefined):
       ...(input?.columnMapping || {}),
     },
   };
-
-  const spreadsheetId = extractSpreadsheetId(mergedSettings.googleSheetsId);
-  const defaultSpreadsheetId = extractSpreadsheetId(DEFAULT_SYSTEM_SETTINGS.googleSheetsId);
-
-  if (spreadsheetId === defaultSpreadsheetId) {
-    return {
-      ...mergedSettings,
-      sheetName: DEFAULT_SYSTEM_SETTINGS.sheetName,
-      sheetGid: DEFAULT_SYSTEM_SETTINGS.sheetGid,
-      columnMapping: { ...DEFAULT_SYSTEM_SETTINGS.columnMapping },
-    };
-  }
-
-  return mergedSettings;
 }
 
 function extractSpreadsheetId(value: string) {
@@ -67,24 +58,18 @@ function extractSheetGid(settings: SystemSettings) {
   return match?.[1] || "0";
 }
 
+function escapeSheetNameForRange(sheetName: string) {
+  return /^[A-Za-z0-9_]+$/.test(sheetName)
+    ? sheetName
+    : `'${sheetName.replace(/'/g, "''")}'`;
+}
+
 function normalizeHeader(value: string | undefined) {
   return (value || "").trim().replace(/\s+/g, "").toLowerCase();
 }
 
 function normalizeLookupValue(value: string | undefined) {
   return (value || "").trim();
-}
-
-function normalizeSpreadsheetValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? String(value) : String(value).replace(/\.0+$/, "");
-  }
-
-  return String(value).trim().replace(/\.0+$/, "");
 }
 
 function isRefusalStatus(value: string | undefined) {
@@ -105,6 +90,19 @@ function getSheetDepartmentValue(requestedAction: string, department: string, co
   }
 
   return "";
+}
+
+function prioritizeSheetNames(sheetNames: string[], preferredSheetName?: string) {
+  const normalizedPreferredSheetName = preferredSheetName?.trim();
+
+  if (!normalizedPreferredSheetName || !sheetNames.includes(normalizedPreferredSheetName)) {
+    return sheetNames;
+  }
+
+  return [
+    normalizedPreferredSheetName,
+    ...sheetNames.filter((sheetName) => sheetName !== normalizedPreferredSheetName),
+  ];
 }
 
 function columnLetterToIndex(columnName: string) {
@@ -161,6 +159,28 @@ function findPatientRowNumber(
   return matchingRowIndex >= 0 ? matchingRowIndex + 2 : null;
 }
 
+function findPatientInSheetEntries(
+  sheetEntries: WorkbookSheetRows[],
+  settings: SystemSettings,
+  historyNumber: string,
+  personalId: string,
+) {
+  for (const sheetEntry of sheetEntries) {
+    const patient = mapPatientFromSheet(sheetEntry.rows, settings, historyNumber, personalId);
+    const rowNumber = findPatientRowNumber(sheetEntry.rows, settings, historyNumber, personalId);
+
+    if (patient && rowNumber) {
+      return {
+        patient,
+        rowNumber,
+        sheetName: sheetEntry.sheetName,
+      };
+    }
+  }
+
+  return null;
+}
+
 async function updateSheetRequestData(
   settings: SystemSettings,
   historyNumber: string,
@@ -173,17 +193,10 @@ async function updateSheetRequestData(
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
   const sheets = google.sheets({ version: "v4", auth });
-  const sheetName = settings.sheetName || DEFAULT_SYSTEM_SETTINGS.sheetName || "Sheet1";
-  const readRange = `${sheetName}!A:Z`;
-  const readResponse = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: readRange,
-  });
+  const sheetEntries = await fetchWorkbookSheetRows(settings);
+  const patientMatch = findPatientInSheetEntries(sheetEntries, settings, historyNumber, personalId);
 
-  const rows = readResponse.data.values || [];
-  const rowNumber = findPatientRowNumber(rows, settings, historyNumber, personalId);
-
-  if (!rowNumber) {
+  if (!patientMatch) {
     throw new Error("Patient row not found for sheet update");
   }
 
@@ -192,7 +205,7 @@ async function updateSheetRequestData(
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!H${rowNumber}:I${rowNumber}`,
+    range: `${escapeSheetNameForRange(patientMatch.sheetName)}!H${patientMatch.rowNumber}:I${patientMatch.rowNumber}`,
     valueInputOption: "RAW",
     requestBody: {
       values: [[diagnosisValue, departmentValue]],
@@ -200,7 +213,8 @@ async function updateSheetRequestData(
   });
 
   return {
-    rowNumber,
+    rowNumber: patientMatch.rowNumber,
+    sheetName: patientMatch.sheetName,
     diagnosisValue,
     departmentValue,
   };
@@ -264,7 +278,7 @@ function parseCsv(csvText: string) {
   return rows.filter((row) => row.some((cell) => cell.trim() !== ""));
 }
 
-async function fetchPublicSheetRows(settings: SystemSettings) {
+async function fetchPublicSheetRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const gid = extractSheetGid(settings);
   const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
@@ -275,10 +289,15 @@ async function fetchPublicSheetRows(settings: SystemSettings) {
   }
 
   const csvText = await response.text();
-  return parseCsv(csvText);
+  return [
+    {
+      sheetName: settings.sheetName?.trim() || DEFAULT_SYSTEM_SETTINGS.sheetName || "Sheet1",
+      rows: parseCsv(csvText),
+    },
+  ];
 }
 
-async function fetchWorkbookSheetRows(settings: SystemSettings) {
+async function fetchWorkbookSheetRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
   const response = await fetch(url);
@@ -289,34 +308,48 @@ async function fetchWorkbookSheetRows(settings: SystemSettings) {
 
   const buffer = Buffer.from(await response.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheetName = settings.sheetName?.trim() || DEFAULT_SYSTEM_SETTINGS.sheetName;
+  const orderedSheetNames = prioritizeSheetNames(
+    workbook.SheetNames,
+    settings.sheetName?.trim(),
+  );
 
-  if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
-    throw new Error(`Sheet not found: ${sheetName || "unknown"}`);
-  }
-
-  const worksheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-    header: "A",
-    defval: "",
-    raw: false,
-  });
+  return orderedSheetNames.map((sheetName) => ({
+    sheetName,
+    rows: XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[sheetName], {
+      header: 1,
+      defval: "",
+      raw: false,
+    }) as string[][],
+  }));
 }
 
-async function fetchGoogleApiRows(settings: SystemSettings) {
+async function fetchGoogleApiRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
   const sheets = google.sheets({ version: "v4", auth });
-  const range = `${settings.sheetName || DEFAULT_SYSTEM_SETTINGS.sheetName || "Sheet1"}!A:Z`;
-  const response = await sheets.spreadsheets.values.get({
+  const spreadsheet = await sheets.spreadsheets.get({
     spreadsheetId,
-    range,
+    fields: "sheets.properties(title)",
+  });
+  const sheetNames = prioritizeSheetNames(
+    (spreadsheet.data.sheets || [])
+      .map((sheet) => sheet.properties?.title || "")
+      .filter(Boolean),
+    settings.sheetName?.trim(),
+  );
+
+  const response = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId,
+    ranges: sheetNames.map((sheetName) => `${escapeSheetNameForRange(sheetName)}!A:Z`),
   });
 
-  return response.data.values || [];
+  return (response.data.valueRanges || []).map((valueRange, index) => ({
+    sheetName: sheetNames[index],
+    rows: valueRange.values || [],
+  }));
 }
 
-async function fetchSheetRows(settings: SystemSettings) {
+async function fetchSheetRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
   try {
     return await fetchWorkbookSheetRows(settings);
   } catch (workbookError) {
@@ -329,48 +362,6 @@ async function fetchSheetRows(settings: SystemSettings) {
     console.warn("Public sheet fetch failed, falling back to Google Sheets API.", publicError);
     return await fetchGoogleApiRows(settings);
   }
-}
-
-function mapPatientFromWorkbookRows(
-  rows: Record<string, unknown>[],
-  settings: SystemSettings,
-  historyNumber: string,
-  personalId: string,
-) {
-  if (!rows.length) {
-    return null;
-  }
-
-  const normalizedHistoryNumber = normalizeLookupValue(historyNumber);
-  const normalizedPersonalId = normalizeLookupValue(personalId);
-  const firstNameColumn = settings.columnMapping.firstName || "C";
-  const lastNameColumn = settings.columnMapping.lastName || "B";
-  const historyNumberColumn = settings.columnMapping.historyNumber || "F";
-  const personalIdColumn = settings.columnMapping.personalId || "D";
-
-  const patientRow = rows.find((row) => {
-    const rowHistoryNumber = normalizeSpreadsheetValue(row[historyNumberColumn]);
-    const rowPersonalId = normalizeSpreadsheetValue(row[personalIdColumn]);
-
-    return (
-      (normalizedHistoryNumber && rowHistoryNumber === normalizedHistoryNumber) ||
-      (normalizedPersonalId && rowPersonalId === normalizedPersonalId)
-    );
-  });
-
-  if (!patientRow) {
-    return null;
-  }
-
-  return {
-    firstName: normalizeSpreadsheetValue(patientRow[firstNameColumn]),
-    lastName: normalizeSpreadsheetValue(patientRow[lastNameColumn]),
-    historyNumber: normalizeSpreadsheetValue(patientRow[historyNumberColumn]),
-    personalId: normalizeSpreadsheetValue(patientRow[personalIdColumn]),
-    birthDate: "",
-    phone: "",
-    address: "",
-  };
 }
 
 function mapPatientFromSheet(rows: string[][], settings: SystemSettings, historyNumber: string, personalId: string) {
@@ -463,16 +454,19 @@ async function startServer() {
     }
 
     try {
-      const rows = await fetchSheetRows(settings);
-      const patient = Array.isArray(rows[0])
-        ? mapPatientFromSheet(rows as string[][], settings, historyNumber, personalId)
-        : mapPatientFromWorkbookRows(rows as Record<string, unknown>[], settings, historyNumber, personalId);
+      const sheetEntries = await fetchSheetRows(settings);
+      const patientMatch = findPatientInSheetEntries(
+        sheetEntries,
+        settings,
+        historyNumber,
+        personalId,
+      );
 
-      if (!patient) {
+      if (!patientMatch) {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      res.json(patient);
+      res.json(patientMatch.patient);
     } catch (error: any) {
       console.error("Google Sheets Error:", error);
       res.status(500).json({ error: "Failed to fetch from Google Sheets", details: error.message });

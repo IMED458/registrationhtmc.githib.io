@@ -176,6 +176,9 @@ export default function AdminSettingsPage() {
                   value={settings.sheetName}
                   onChange={(e) => setSettings({ ...settings, sheetName: e.target.value })}
                 />
+                <p className="text-xs text-slate-400">
+                  პაციენტის ძებნა ახლა მთელ workbook-ში ხდება. ეს ველი მხოლოდ პრიორიტეტულ sheet-ს ნიშნავს.
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">Sheet GID</label>

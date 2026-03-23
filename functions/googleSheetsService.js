@@ -36,7 +36,7 @@ function getGoogleAuthClient() {
 }
 
 function mergeSystemSettings(input) {
-  const mergedSettings = {
+  return {
     ...DEFAULT_SYSTEM_SETTINGS,
     ...(input || {}),
     columnMapping: {
@@ -44,20 +44,6 @@ function mergeSystemSettings(input) {
       ...((input && input.columnMapping) || {}),
     },
   };
-
-  const spreadsheetId = extractSpreadsheetId(mergedSettings.googleSheetsId);
-  const defaultSpreadsheetId = extractSpreadsheetId(DEFAULT_SYSTEM_SETTINGS.googleSheetsId);
-
-  if (spreadsheetId === defaultSpreadsheetId) {
-    return {
-      ...mergedSettings,
-      sheetName: DEFAULT_SYSTEM_SETTINGS.sheetName,
-      sheetGid: DEFAULT_SYSTEM_SETTINGS.sheetGid,
-      columnMapping: { ...DEFAULT_SYSTEM_SETTINGS.columnMapping },
-    };
-  }
-
-  return mergedSettings;
 }
 
 function extractSpreadsheetId(value) {
@@ -73,6 +59,12 @@ function extractSheetGid(settings) {
 
   const match = String(settings.googleSheetsId || '').match(/[?&]gid=(\d+)/);
   return (match && match[1]) || '0';
+}
+
+function escapeSheetNameForRange(sheetName) {
+  return /^[A-Za-z0-9_]+$/.test(sheetName)
+    ? sheetName
+    : `'${sheetName.replace(/'/g, "''")}'`;
 }
 
 function normalizeHeader(value) {
@@ -113,6 +105,19 @@ function getSheetDepartmentValue(requestedAction, department, consentStatus) {
   }
 
   return '';
+}
+
+function prioritizeSheetNames(sheetNames, preferredSheetName) {
+  const normalizedPreferredSheetName = String(preferredSheetName || '').trim();
+
+  if (!normalizedPreferredSheetName || !sheetNames.includes(normalizedPreferredSheetName)) {
+    return sheetNames;
+  }
+
+  return [
+    normalizedPreferredSheetName,
+    ...sheetNames.filter((sheetName) => sheetName !== normalizedPreferredSheetName),
+  ];
 }
 
 function columnLetterToIndex(columnName) {
@@ -173,20 +178,31 @@ function findPatientRowNumber(rows, settings, historyNumber, personalId) {
   return matchingRowIndex >= 0 ? matchingRowIndex + 2 : null;
 }
 
+function findPatientInSheetEntries(sheetEntries, settings, historyNumber, personalId) {
+  for (const sheetEntry of sheetEntries) {
+    const patient = mapPatientFromSheet(sheetEntry.rows, settings, historyNumber, personalId);
+    const rowNumber = findPatientRowNumber(sheetEntry.rows, settings, historyNumber, personalId);
+
+    if (patient && rowNumber) {
+      return {
+        patient,
+        rowNumber,
+        sheetName: sheetEntry.sheetName,
+      };
+    }
+  }
+
+  return null;
+}
+
 async function updateSheetRequestData(settings, historyNumber, personalId, icdCode, requestedAction, department, consentStatus) {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
   const sheets = google.sheets({ version: 'v4', auth });
-  const sheetName = settings.sheetName || DEFAULT_SYSTEM_SETTINGS.sheetName || 'Sheet1';
-  const readResponse = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${sheetName}!A:Z`,
-  });
+  const sheetEntries = await fetchWorkbookSheetRows(settings);
+  const patientMatch = findPatientInSheetEntries(sheetEntries, settings, historyNumber, personalId);
 
-  const rows = readResponse.data.values || [];
-  const rowNumber = findPatientRowNumber(rows, settings, historyNumber, personalId);
-
-  if (!rowNumber) {
+  if (!patientMatch) {
     throw new Error('Patient row not found for sheet update');
   }
 
@@ -195,7 +211,7 @@ async function updateSheetRequestData(settings, historyNumber, personalId, icdCo
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!H${rowNumber}:I${rowNumber}`,
+    range: `${escapeSheetNameForRange(patientMatch.sheetName)}!H${patientMatch.rowNumber}:I${patientMatch.rowNumber}`,
     valueInputOption: 'RAW',
     requestBody: {
       values: [[diagnosisValue, departmentValue]],
@@ -203,7 +219,8 @@ async function updateSheetRequestData(settings, historyNumber, personalId, icdCo
   });
 
   return {
-    rowNumber,
+    rowNumber: patientMatch.rowNumber,
+    sheetName: patientMatch.sheetName,
     diagnosisValue,
     departmentValue,
   };
@@ -270,7 +287,12 @@ async function fetchPublicSheetRows(settings) {
   }
 
   const csvText = await response.text();
-  return parseCsv(csvText);
+  return [
+    {
+      sheetName: String(settings.sheetName || '').trim() || DEFAULT_SYSTEM_SETTINGS.sheetName || 'Sheet1',
+      rows: parseCsv(csvText),
+    },
+  ];
 }
 
 async function fetchWorkbookSheetRows(settings) {
@@ -285,29 +307,45 @@ async function fetchWorkbookSheetRows(settings) {
 
   const buffer = Buffer.from(await response.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = String(settings.sheetName || '').trim() || DEFAULT_SYSTEM_SETTINGS.sheetName;
+  const orderedSheetNames = prioritizeSheetNames(
+    workbook.SheetNames,
+    String(settings.sheetName || '').trim(),
+  );
 
-  if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
-    throw new Error(`Sheet not found: ${sheetName || 'unknown'}`);
-  }
-
-  return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-    header: 'A',
-    defval: '',
-    raw: false,
-  });
+  return orderedSheetNames.map((sheetName) => ({
+    sheetName,
+    rows: XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      header: 1,
+      defval: '',
+      raw: false,
+    }),
+  }));
 }
 
 async function fetchGoogleApiRows(settings) {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
   const sheets = google.sheets({ version: 'v4', auth });
-  const response = await sheets.spreadsheets.values.get({
+  const spreadsheet = await sheets.spreadsheets.get({
     spreadsheetId,
-    range: `${settings.sheetName || DEFAULT_SYSTEM_SETTINGS.sheetName || 'Sheet1'}!A:Z`,
+    fields: 'sheets.properties(title)',
+  });
+  const sheetNames = prioritizeSheetNames(
+    (spreadsheet.data.sheets || [])
+      .map((sheet) => (sheet.properties && sheet.properties.title) || '')
+      .filter(Boolean),
+    String(settings.sheetName || '').trim(),
+  );
+
+  const response = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId,
+    ranges: sheetNames.map((sheetName) => `${escapeSheetNameForRange(sheetName)}!A:Z`),
   });
 
-  return response.data.values || [];
+  return (response.data.valueRanges || []).map((valueRange, index) => ({
+    sheetName: sheetNames[index],
+    rows: valueRange.values || [],
+  }));
 }
 
 async function fetchSheetRows(settings) {
@@ -323,43 +361,6 @@ async function fetchSheetRows(settings) {
     console.warn('Public sheet fetch failed, falling back to Google Sheets API.', publicError);
     return fetchGoogleApiRows(settings);
   }
-}
-
-function mapPatientFromWorkbookRows(rows, settings, historyNumber, personalId) {
-  if (!rows.length) {
-    return null;
-  }
-
-  const normalizedHistoryNumber = normalizeLookupValue(historyNumber);
-  const normalizedPersonalId = normalizeLookupValue(personalId);
-  const firstNameColumn = settings.columnMapping.firstName || 'C';
-  const lastNameColumn = settings.columnMapping.lastName || 'B';
-  const historyNumberColumn = settings.columnMapping.historyNumber || 'F';
-  const personalIdColumn = settings.columnMapping.personalId || 'D';
-
-  const patientRow = rows.find((row) => {
-    const rowHistoryNumber = normalizeSpreadsheetValue(row[historyNumberColumn]);
-    const rowPersonalId = normalizeSpreadsheetValue(row[personalIdColumn]);
-
-    return (
-      (normalizedHistoryNumber && rowHistoryNumber === normalizedHistoryNumber) ||
-      (normalizedPersonalId && rowPersonalId === normalizedPersonalId)
-    );
-  });
-
-  if (!patientRow) {
-    return null;
-  }
-
-  return {
-    firstName: normalizeSpreadsheetValue(patientRow[firstNameColumn]),
-    lastName: normalizeSpreadsheetValue(patientRow[lastNameColumn]),
-    historyNumber: normalizeSpreadsheetValue(patientRow[historyNumberColumn]),
-    personalId: normalizeSpreadsheetValue(patientRow[personalIdColumn]),
-    birthDate: '',
-    phone: '',
-    address: '',
-  };
 }
 
 function mapPatientFromSheet(rows, settings, historyNumber, personalId) {
@@ -407,11 +408,10 @@ function mapPatientFromSheet(rows, settings, historyNumber, personalId) {
 
 async function lookupPatient(settingsInput, historyNumber, personalId) {
   const settings = mergeSystemSettings(settingsInput);
-  const rows = await fetchSheetRows(settings);
+  const sheetEntries = await fetchSheetRows(settings);
+  const patientMatch = findPatientInSheetEntries(sheetEntries, settings, historyNumber, personalId);
 
-  return Array.isArray(rows[0])
-    ? mapPatientFromSheet(rows, settings, historyNumber, personalId)
-    : mapPatientFromWorkbookRows(rows, settings, historyNumber, personalId);
+  return patientMatch ? patientMatch.patient : null;
 }
 
 module.exports = {
