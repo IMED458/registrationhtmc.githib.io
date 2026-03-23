@@ -28,6 +28,20 @@ function getRequestTimestampValue(request: ClinicalRequest) {
   return 0;
 }
 
+function getRequestActionLabel(request: ClinicalRequest) {
+  if (request.consentStatus?.startsWith('უარი')) {
+    return request.consentStatus;
+  }
+
+  return request.requestedAction;
+}
+
+function getRequestActionTextClass(request: ClinicalRequest) {
+  return request.consentStatus?.startsWith('უარი')
+    ? 'text-red-600'
+    : 'text-slate-700';
+}
+
 export default function Dashboard() {
   const { profile, isDoctorOrNurse, isRegistrar, isAdmin } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
@@ -133,7 +147,8 @@ export default function Dashboard() {
       req.patientData.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.patientData.historyNumber.includes(searchTerm) ||
       req.patientData.personalId.includes(searchTerm) ||
-      (req.icdCode || req.diagnosis || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (req.icdCode || req.diagnosis || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getRequestActionLabel(req).toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'ყველა' || req.currentStatus === statusFilter;
     
@@ -256,7 +271,9 @@ export default function Dashboard() {
                       <div className="text-xs text-slate-400">{req.patientData.personalId}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-slate-700">{req.requestedAction}</div>
+                      <div className={`text-sm font-medium ${getRequestActionTextClass(req)}`}>
+                        {getRequestActionLabel(req)}
+                      </div>
                       {req.studyType && <div className="text-xs text-emerald-600 font-bold">{req.studyType}</div>}
                     </td>
                     <td className="px-6 py-4">
