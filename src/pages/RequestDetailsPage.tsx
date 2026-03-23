@@ -28,6 +28,11 @@ type RequestEditFormState = {
   birthDate: string;
   phone: string;
   address: string;
+  requestedAction: string;
+  department: string;
+  studyTypesText: string;
+  consentStatus: string;
+  doctorComment: string;
   diagnoses: DiagnosisFormRow[];
   currentStatus: string;
   finalDecision: string;
@@ -122,6 +127,11 @@ function getPatientSignature(request: ClinicalRequest) {
     request.patientData.birthDate || '',
     request.patientData.phone || '',
     request.patientData.address || '',
+    request.requestedAction || '',
+    request.department || '',
+    JSON.stringify(getStudyTypes(request)),
+    request.consentStatus || '',
+    request.doctorComment || '',
     request.icdCode || '',
     request.diagnosis || '',
     JSON.stringify(request.diagnoses || []),
@@ -182,6 +192,11 @@ function buildFormDataFromRequest(
     birthDate: data?.patientData.birthDate || '',
     phone: data?.patientData.phone || '',
     address: data?.patientData.address || '',
+    requestedAction: data?.requestedAction || '',
+    department: data?.department || '',
+    studyTypesText: data ? getStudyTypes(data).join(', ') : '',
+    consentStatus: data?.consentStatus || '',
+    doctorComment: data?.doctorComment || '',
     diagnoses: diagnosisRows.length ? diagnosisRows : [createDiagnosisFormRow({ isPrimary: true })],
     currentStatus: data?.currentStatus || '',
     finalDecision: data?.finalDecision || '',
@@ -217,7 +232,8 @@ export default function RequestDetailsPage() {
     !!profile &&
     (request.createdByUserId === profile.uid || request.createdByUserEmail === profile.email);
   const canDoctorEdit = isDoctorOrNurse && isRequestOwner && !isAdmin && !isRegistrar;
-  const canManageRequest = isRegistrar || isAdmin || canDoctorEdit;
+  const canOpenFullEdit = canDoctorEdit || isAdmin;
+  const showManagementPanel = isRegistrarOnly || isAdmin;
   const requiresRegistrarComment = isRegistrarOnly && Boolean(request?.lastRegistrarEditAt);
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
@@ -432,10 +448,10 @@ export default function RequestDetailsPage() {
       return;
     }
 
-    if (canDoctorEdit) {
+    if (canDoctorEdit || (isAdmin && isEditing)) {
       const diagnoses = sanitizeDiagnosisRows(formData.diagnoses);
 
-      if (request.requestedAction !== 'კვლევა' && diagnoses.length === 0) {
+      if (formData.requestedAction !== 'კვლევა' && diagnoses.length === 0) {
         setFormError('მიუთითეთ მინიმუმ ერთი დიაგნოზი.');
         return;
       }
@@ -630,6 +646,66 @@ export default function RequestDetailsPage() {
         return;
       }
 
+      if (isAdmin && isEditing) {
+        const diagnoses = sanitizeDiagnosisRows(formData.diagnoses);
+        const representativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses });
+        const studyTypes = formData.studyTypesText
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean);
+
+        await updateDoc(requestRef, {
+          patientData: {
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            historyNumber: formData.historyNumber.trim(),
+            personalId: formData.personalId.trim(),
+            birthDate: formData.birthDate,
+            phone: formData.phone.trim(),
+            address: formData.address.trim(),
+          },
+          requestedAction: formData.requestedAction.trim(),
+          department: formData.department.trim(),
+          studyType: studyTypes.join(', '),
+          studyTypes,
+          consentStatus: formData.consentStatus.trim(),
+          doctorComment: formData.doctorComment.trim(),
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          currentStatus: formData.currentStatus,
+          finalDecision: formData.finalDecision,
+          registrarComment: formData.registrarComment.trim(),
+          registrarName: formData.registrarName.trim(),
+          formFillerName: formData.formFillerName.trim() || getDefaultFormFillerName(request, profile.fullName),
+          pendingRegistrarUpdate: null,
+          pendingDoctorEdit: null,
+          adminConfirmationStatus: 'confirmed',
+          adminConfirmedAt: Timestamp.now(),
+          adminConfirmedByUserId: profile.uid,
+          adminConfirmedByUserName: profile.fullName,
+          requiresRegistrarAction: false,
+          updatedAt: Timestamp.now(),
+        });
+
+        await writeAuditLogEntry({
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: id,
+          actionType: 'ADMIN_FULL_EDIT',
+          oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getUpdateSummary(request.currentStatus, request.finalDecision)}`,
+          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getUpdateSummary(formData.currentStatus, formData.finalDecision)}`,
+        });
+
+        setConfirmAction(null);
+        setIsEditing(false);
+        setSuccessDialogContent({
+          title: 'მონაცემები განახლდა',
+          message: 'ადმინისტრატორმა ცვლილებები სრულად შეინახა.',
+        });
+        return;
+      }
+
       const adminUpdateData: Record<string, any> = {
         ...baseUpdate,
       };
@@ -689,8 +765,10 @@ export default function RequestDetailsPage() {
               : 'ნამდვილად გსურთ რეგისტრატორის მიერ შეტანილი ცვლილების დადასტურება?'
             : isRegistrarOnly
               ? 'ცვლილება დაუყოვნებლივ შეინახება და ადმინთან შეტყობინებაც გაიგზავნება. გაგრძელება გსურთ?'
-              : canDoctorEdit
-                ? 'პაციენტის მონაცემები და დიაგნოზი დაუყოვნებლივ განახლდება, ჩანაწერი რედაქტირებულად მოინიშნება და ადმინთან შეტყობინება გაიგზავნება. გაგრძელება გსურთ?'
+            : canDoctorEdit
+              ? 'პაციენტის მონაცემები და დიაგნოზი დაუყოვნებლივ განახლდება, ჩანაწერი რედაქტირებულად მოინიშნება და ადმინთან შეტყობინება გაიგზავნება. გაგრძელება გსურთ?'
+              : isAdmin && isEditing
+                ? 'ადმინისტრატორის სრული რედაქტირება დაუყოვნებლივ შეინახება. გაგრძელება გსურთ?'
                 : 'ნამდვილად გსურთ სტატუსის განახლება?',
         confirmLabel: confirmAction === 'approve' ? 'დადასტურება' : 'OK',
       }
@@ -727,7 +805,7 @@ export default function RequestDetailsPage() {
           <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნის დეტალები</h2>
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          {canManageRequest && (
+          {canOpenFullEdit && (
             isEditing ? (
               <button
                 type="button"
@@ -916,7 +994,7 @@ export default function RequestDetailsPage() {
             </div>
           )}
 
-          {canManageRequest && isEditing && (
+          {canOpenFullEdit && isEditing && (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -924,21 +1002,19 @@ export default function RequestDetailsPage() {
                   <h3 className="font-bold text-slate-700">რედაქტირება</h3>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {canDoctorEdit ? 'პაციენტი და დიაგნოზი' : 'მოთხოვნის მართვა'}
+                  {canDoctorEdit ? 'პაციენტი და დიაგნოზი' : 'სრული წვდომა'}
                 </span>
               </div>
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
-                {isRegistrarOnly && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    {requiresRegistrarComment
-                      ? 'ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.'
-                      : 'პირველი მოქმედებისას კომენტარი არჩევითია. შემდეგი რედაქტირებიდან კომენტარი უკვე სავალდებულო გახდება.'}
-                  </div>
-                )}
-
                 {canDoctorEdit && (
                   <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
                     ექიმის/ექთნის ცვლილება მაშინვე შეინახება, მაგრამ რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. კომენტარი სავალდებულოა.
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+                    ადმინისტრატორს შეუძლია ამ რეჟიმიდან შეცვალოს ყველა ძირითადი ველი. ცვლილება დაუყოვნებლივ შეინახება.
                   </div>
                 )}
 
@@ -948,24 +1024,30 @@ export default function RequestDetailsPage() {
                   </div>
                 )}
 
-                {canDoctorEdit ? (
+                {(canDoctorEdit || isAdmin) ? (
                   <>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="text-xs font-bold uppercase text-slate-500">მიმდინარე სტატუსი</div>
-                        <div className="mt-1 font-bold text-slate-900">{request.currentStatus}</div>
+                    {!isAdmin && (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="text-xs font-bold uppercase text-slate-500">მიმდინარე სტატუსი</div>
+                          <div className="mt-1 font-bold text-slate-900">{request.currentStatus}</div>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="text-xs font-bold uppercase text-slate-500">საბოლოო გადაწყვეტილება</div>
+                          <div className="mt-1 font-bold text-slate-900">{request.finalDecision || '-'}</div>
+                        </div>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="text-xs font-bold uppercase text-slate-500">საბოლოო გადაწყვეტილება</div>
-                        <div className="mt-1 font-bold text-slate-900">{request.finalDecision || '-'}</div>
-                      </div>
-                    </div>
+                    )}
 
                     <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div>
-                        <div className="text-sm font-bold text-slate-800">პაციენტის მონაცემების რედაქტირება</div>
+                        <div className="text-sm font-bold text-slate-800">
+                          {isAdmin ? 'პაციენტის და მოთხოვნის მონაცემების რედაქტირება' : 'პაციენტის მონაცემების რედაქტირება'}
+                        </div>
                         <p className="mt-1 text-xs leading-5 text-slate-500">
-                          სტატუსის მართვა ექიმისთვის გამორთულია. აქედან შეგიძლიათ შეცვალოთ მხოლოდ პაციენტის მონაცემები და დიაგნოზები.
+                          {isAdmin
+                            ? 'აქედან შეგიძლიათ შეცვალოთ პაციენტის, მოთხოვნის, დიაგნოზის და რეგისტრატურის ძირითადი ველები.'
+                            : 'სტატუსის მართვა ექიმისთვის გამორთულია. აქედან შეგიძლიათ შეცვალოთ მხოლოდ პაციენტის მონაცემები და დიაგნოზები.'}
                         </p>
                       </div>
 
@@ -1035,6 +1117,118 @@ export default function RequestDetailsPage() {
                         </div>
                       </div>
                     </div>
+
+                    {isAdmin && (
+                      <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">მოთხოვნის და რეგისტრატურის ველები</div>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                            აქედან შეგიძლიათ შეცვალოთ მოთხოვნილი მოქმედება, განყოფილება, კვლევები, თანხმობა, სტატუსი და რეგისტრატურის ველები.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">მოთხოვნილი მოქმედება</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.requestedAction}
+                              onChange={(e) => setFormData({ ...formData, requestedAction: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">განყოფილება</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.department}
+                              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2 sm:col-span-2">
+                            <label className="text-sm font-bold text-slate-700">კვლევის ტიპები</label>
+                            <input
+                              type="text"
+                              placeholder="რამდენიმე მნიშვნელობა გამოყავი მძიმით"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.studyTypesText}
+                              onChange={(e) => setFormData({ ...formData, studyTypesText: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">პაციენტის თანხმობა / უარი</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.consentStatus}
+                              onChange={(e) => setFormData({ ...formData, consentStatus: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">ექიმის კომენტარი</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.doctorComment}
+                              onChange={(e) => setFormData({ ...formData, doctorComment: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">მიმდინარე სტატუსი</label>
+                            <select
+                              className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                              value={formData.currentStatus}
+                              onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
+                            >
+                              {statusOptions.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">საბოლოო გადაწყვეტილება</label>
+                            <select
+                              className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                              value={formData.finalDecision}
+                              onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
+                            >
+                              <option value="">აირჩიეთ...</option>
+                              {finalDecisionOptions.map((decision) => (
+                                <option key={decision} value={decision}>{decision}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">რეგისტრატორის სახელი, გვარი</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.registrarName}
+                              onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700">ფურცლის შემვსები პირი</label>
+                            <input
+                              type="text"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.formFillerName}
+                              onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2 sm:col-span-2">
+                            <label className="text-sm font-bold text-slate-700">რეგისტრატორის კომენტარი</label>
+                            <textarea
+                              rows={3}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none resize-none focus:ring-2 focus:ring-emerald-500"
+                              value={formData.registrarComment}
+                              onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1316,6 +1510,110 @@ export default function RequestDetailsPage() {
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {showManagementPanel && (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24">
+              <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-slate-700">სტატუსის მართვა</h3>
+              </div>
+              <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
+                {isRegistrarOnly && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                    {requiresRegistrarComment
+                      ? 'ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.'
+                      : 'პირველი მოქმედებისას კომენტარი არჩევითია. შემდეგი რედაქტირებიდან კომენტარი უკვე სავალდებულო გახდება.'}
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                    ადმინისტრატორს შეუძლია სტატუსის სწრაფი განახლება აქედან, ხოლო სრული რედაქტირება `რედაქტირება` ღილაკიდან.
+                  </div>
+                )}
+
+                {formError && !isEditing && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {formError}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">მიმდინარე სტატუსი</label>
+                  <select
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                    value={formData.currentStatus}
+                    onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
+                  >
+                    {statusOptions.map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">საბოლოო გადაწყვეტილება</label>
+                  <select
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                    value={formData.finalDecision}
+                    onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
+                  >
+                    <option value="">აირჩიეთ...</option>
+                    {finalDecisionOptions.map((decision) => (
+                      <option key={decision} value={decision}>{decision}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">რეგისტრატორის სახელი, გვარი</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      value={formData.registrarName}
+                      onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">ფურცლის შემვსები პირი</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      value={formData.formFillerName}
+                      onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    რეგისტრატორის კომენტარი
+                    {requiresRegistrarComment ? (
+                      <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>
+                    ) : (
+                      <span className="ml-2 text-xs text-slate-400">(პირველი მოქმედებისთვის არჩევითი)</span>
+                    )}
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                    value={formData.registrarComment}
+                    onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                  შენახვა
+                </button>
+              </form>
             </div>
           )}
 
