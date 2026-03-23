@@ -1590,101 +1590,6 @@ export default function RequestDetailsPage() {
         </div>
 
         <div className="space-y-6">
-          {pendingDoctorEdit && (
-            <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
-              <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-sky-900">ექიმის რედაქტირება</h3>
-              </div>
-              <div className="space-y-4 p-4 sm:p-6">
-                <p className="text-sm leading-6 text-sky-900">
-                  {isRegistrar || isAdmin
-                    ? 'ექიმმა/ექთანმა პაციენტის მონაცემები ან დიაგნოზები შეცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
-                    : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'}
-                </p>
-                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-                  <div>
-                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტორი</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingDoctorEdit.editedByUserName}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტირების დრო</div>
-                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingDoctorEdit.editedAt)}</div>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-bold uppercase text-sky-700">ექიმის კომენტარი</div>
-                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
-                    {pendingDoctorEdit.comment}
-                  </div>
-                </div>
-                {isAdmin && request.adminConfirmationStatus === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={handleApprovePendingUpdate}
-                    disabled={updating}
-                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    დადასტურება
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {pendingUpdate && (
-            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
-              <div className="border-b border-amber-200 px-6 py-3 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-amber-900">ადმინისტრატორის შეტყობინება</h3>
-              </div>
-              <div className="space-y-4 p-4 sm:p-6">
-                <p className="text-sm leading-6 text-amber-900">
-                  {isAdmin
-                    ? 'რეგისტრატორმა უკვე შეცვალა ჩანაწერი. აქედან ან ადმინისტრირების გვერდიდან შეგიძლიათ დადასტურება.'
-                    : 'თქვენი ცვლილება უკვე ჩაიწერა. ადმინისტრატორს დადასტურების შეტყობინება გაეგზავნა.'}
-                </p>
-
-                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">ახალი სტატუსი</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.currentStatus}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">საბოლოო გადაწყვეტილება</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.finalDecision || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტორი</div>
-                    <div className="mt-1 text-slate-700">{pendingUpdate.requestedByUserName}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტირების დრო</div>
-                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingUpdate.requestedAt)}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs font-bold uppercase text-amber-700">სავალდებულო კომენტარი</div>
-                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
-                    {pendingUpdate.registrarComment || '-'}
-                  </div>
-                </div>
-
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={handleApprovePendingUpdate}
-                    disabled={updating}
-                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    დადასტურება
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {showManagementPanel && (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
@@ -1692,14 +1597,6 @@ export default function RequestDetailsPage() {
                 <h3 className="font-bold text-slate-700">სტატუსის მართვა</h3>
               </div>
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
-                {isRegistrarOnly && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    {requiresRegistrarComment
-                      ? 'ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.'
-                      : 'პირველი მოქმედებისას კომენტარი არჩევითია. შემდეგი რედაქტირებიდან კომენტარი უკვე სავალდებულო გახდება.'}
-                  </div>
-                )}
-
                 {isAdmin && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                     ადმინისტრატორს შეუძლია სტატუსის სწრაფი განახლება აქედან, ხოლო სრული რედაქტირება `რედაქტირება` ღილაკიდან.
@@ -1789,6 +1686,48 @@ export default function RequestDetailsPage() {
             </div>
           )}
 
+          {pendingDoctorEdit && (
+            <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
+              <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-sky-600" />
+                <h3 className="font-bold text-sky-900">ექიმის რედაქტირება</h3>
+              </div>
+              <div className="space-y-4 p-4 sm:p-6">
+                <p className="text-sm leading-6 text-sky-900">
+                  {isRegistrar || isAdmin
+                    ? 'ექიმმა/ექთანმა პაციენტის მონაცემები ან დიაგნოზები შეცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
+                    : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'}
+                </p>
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტორი</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingDoctorEdit.editedByUserName}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-sky-700">რედაქტირების დრო</div>
+                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingDoctorEdit.editedAt)}</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase text-sky-700">ექიმის კომენტარი</div>
+                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                    {pendingDoctorEdit.comment}
+                  </div>
+                </div>
+                {isAdmin && request.adminConfirmationStatus === 'pending' && (
+                  <button
+                    type="button"
+                    onClick={handleApprovePendingUpdate}
+                    disabled={updating}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    დადასტურება
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4 sm:p-6">
             <div className="flex items-center gap-2 text-slate-500">
               <Clock className="w-4 h-4" />
@@ -1821,6 +1760,59 @@ export default function RequestDetailsPage() {
               )}
             </div>
           </div>
+
+          {pendingUpdate && (
+            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
+              <div className="border-b border-amber-200 px-6 py-3 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-amber-900">ადმინისტრატორის შეტყობინება</h3>
+              </div>
+              <div className="space-y-4 p-4 sm:p-6">
+                <p className="text-sm leading-6 text-amber-900">
+                  {isAdmin
+                    ? 'რეგისტრატორმა უკვე შეცვალა ჩანაწერი. აქედან ან ადმინისტრირების გვერდიდან შეგიძლიათ დადასტურება.'
+                    : 'თქვენი ცვლილება უკვე ჩაიწერა. ადმინისტრატორს დადასტურების შეტყობინება გაეგზავნა.'}
+                </p>
+
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">ახალი სტატუსი</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.currentStatus}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">საბოლოო გადაწყვეტილება</div>
+                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.finalDecision || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტორი</div>
+                    <div className="mt-1 text-slate-700">{pendingUpdate.requestedByUserName}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტირების დრო</div>
+                    <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingUpdate.requestedAt)}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-bold uppercase text-amber-700">სავალდებულო კომენტარი</div>
+                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                    {pendingUpdate.registrarComment || '-'}
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={handleApprovePendingUpdate}
+                    disabled={updating}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    დადასტურება
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
