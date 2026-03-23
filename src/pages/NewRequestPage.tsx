@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { lookupPatientFromSheet } from '../sheetLookup';
+import { resolveServerApiUrl } from '../serverApi';
 import { ClinicalRequest } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS } from '../constants';
 import { ArrowLeft, FileText, Loader2, Save, Search, User } from 'lucide-react';
@@ -119,6 +120,13 @@ export default function NewRequestPage() {
     setLoading(true);
     setError('');
     try {
+      let settings = null;
+
+      if (db) {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+        settings = settingsSnap.exists() ? settingsSnap.data() : null;
+      }
+
       const requestData: Omit<ClinicalRequest, 'id'> = {
         patientData: {
           firstName: formData.firstName,
@@ -153,6 +161,35 @@ export default function NewRequestPage() {
         actionType: 'CREATE',
         newValue: 'ახალი მოთხოვნა შეიქმნა',
       });
+
+      const sheetSyncUrl = resolveServerApiUrl('/api/external/sync-request');
+
+      if (sheetSyncUrl) {
+        try {
+          const syncResponse = await fetch(sheetSyncUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              historyNumber: formData.historyNumber,
+              personalId: formData.personalId,
+              icdCode: formData.icdCode,
+              requestedAction: formData.requestedAction,
+              department: formData.department,
+              consentStatus: formData.consentStatus,
+              settings,
+            }),
+          });
+
+          if (!syncResponse.ok) {
+            const syncError = await syncResponse.json().catch(() => null);
+            console.error('Sheet sync error:', syncError);
+            alert('მოთხოვნა შეინახა, მაგრამ ექსელში H/I სვეტების ჩაწერა ვერ მოხერხდა.');
+          }
+        } catch (sheetSyncError) {
+          console.error('Sheet sync request failed:', sheetSyncError);
+          alert('მოთხოვნა შეინახა, მაგრამ ექსელში H/I სვეტების ჩაწერა ვერ მოხერხდა.');
+        }
+      }
 
       navigate('/');
     } catch (err) {

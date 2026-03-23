@@ -13,7 +13,7 @@ dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 function getGoogleAuthClient() {
-  const scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
+  const scopes = ["https://www.googleapis.com/auth/spreadsheets"];
   const inlineCredentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
   if (!inlineCredentials) {
@@ -85,6 +85,125 @@ function normalizeSpreadsheetValue(value: unknown) {
   }
 
   return String(value).trim().replace(/\.0+$/, "");
+}
+
+function isRefusalStatus(value: string | undefined) {
+  return normalizeLookupValue(value).startsWith("უარი");
+}
+
+function getSheetDepartmentValue(requestedAction: string, department: string, consentStatus: string) {
+  if (isRefusalStatus(consentStatus)) {
+    return "ბინა უარი";
+  }
+
+  if (normalizeLookupValue(department)) {
+    return normalizeLookupValue(department);
+  }
+
+  if (normalizeLookupValue(requestedAction) === "ბინა") {
+    return "ბინა";
+  }
+
+  return "";
+}
+
+function columnLetterToIndex(columnName: string) {
+  const normalizedColumnName = columnName.trim().toUpperCase();
+
+  if (!/^[A-Z]+$/.test(normalizedColumnName)) {
+    return -1;
+  }
+
+  let index = 0;
+  for (const character of normalizedColumnName) {
+    index = index * 26 + (character.charCodeAt(0) - 64);
+  }
+
+  return index - 1;
+}
+
+function resolveColumnIndex(rows: string[][], columnName: string) {
+  const columnLetterIndex = columnLetterToIndex(columnName);
+
+  if (columnLetterIndex >= 0) {
+    return columnLetterIndex;
+  }
+
+  const headers = rows[0] || [];
+  return findColumnIndex(headers, columnName);
+}
+
+function findPatientRowNumber(
+  rows: string[][],
+  settings: SystemSettings,
+  historyNumber: string,
+  personalId: string,
+) {
+  if (rows.length < 2) {
+    return null;
+  }
+
+  const historyNumberIndex = resolveColumnIndex(rows, settings.columnMapping.historyNumber || "F");
+  const personalIdIndex = resolveColumnIndex(rows, settings.columnMapping.personalId || "D");
+  const normalizedHistoryNumber = normalizeLookupValue(historyNumber);
+  const normalizedPersonalId = normalizeLookupValue(personalId);
+  const dataRows = rows.slice(1);
+  const matchingRowIndex = dataRows.findIndex((row) => {
+    const rowHistoryNumber = normalizeLookupValue(row[historyNumberIndex]);
+    const rowPersonalId = normalizeLookupValue(row[personalIdIndex]);
+
+    return (
+      (normalizedHistoryNumber && rowHistoryNumber === normalizedHistoryNumber) ||
+      (normalizedPersonalId && rowPersonalId === normalizedPersonalId)
+    );
+  });
+
+  return matchingRowIndex >= 0 ? matchingRowIndex + 2 : null;
+}
+
+async function updateSheetRequestData(
+  settings: SystemSettings,
+  historyNumber: string,
+  personalId: string,
+  icdCode: string,
+  requestedAction: string,
+  department: string,
+  consentStatus: string,
+) {
+  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
+  const auth = getGoogleAuthClient();
+  const sheets = google.sheets({ version: "v4", auth });
+  const sheetName = settings.sheetName || DEFAULT_SYSTEM_SETTINGS.sheetName || "Sheet1";
+  const readRange = `${sheetName}!A:Z`;
+  const readResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: readRange,
+  });
+
+  const rows = readResponse.data.values || [];
+  const rowNumber = findPatientRowNumber(rows, settings, historyNumber, personalId);
+
+  if (!rowNumber) {
+    throw new Error("Patient row not found for sheet update");
+  }
+
+  const diagnosisValue = normalizeLookupValue(icdCode);
+  const departmentValue = getSheetDepartmentValue(requestedAction, department, consentStatus);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!H${rowNumber}:I${rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[diagnosisValue, departmentValue]],
+    },
+  });
+
+  return {
+    rowNumber,
+    diagnosisValue,
+    departmentValue,
+  };
 }
 
 function findColumnIndex(headers: string[], columnName: string) {
@@ -357,6 +476,48 @@ async function startServer() {
     } catch (error: any) {
       console.error("Google Sheets Error:", error);
       res.status(500).json({ error: "Failed to fetch from Google Sheets", details: error.message });
+    }
+  });
+
+  app.post("/api/external/sync-request", async (req, res) => {
+    const {
+      historyNumber,
+      personalId,
+      icdCode,
+      requestedAction,
+      department,
+      consentStatus,
+      settings: incomingSettings,
+    } = req.body;
+    const settings = mergeSystemSettings(incomingSettings);
+
+    if ((!historyNumber && !personalId) || !icdCode) {
+      return res.status(400).json({
+        error: "History number or personal ID and ICD code are required",
+      });
+    }
+
+    try {
+      const result = await updateSheetRequestData(
+        settings,
+        historyNumber,
+        personalId,
+        icdCode,
+        requestedAction,
+        department,
+        consentStatus,
+      );
+
+      res.json({
+        status: "ok",
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("Google Sheets Sync Error:", error);
+      res.status(500).json({
+        error: "Failed to sync request to Google Sheets",
+        details: error.message,
+      });
     }
   });
 
