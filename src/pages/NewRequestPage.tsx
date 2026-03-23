@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { lookupPatientFromSheet } from '../sheetLookup';
 import { ClinicalRequest } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS } from '../constants';
 import { ArrowLeft, FileText, Loader2, Save, Search, User } from 'lucide-react';
@@ -44,8 +45,27 @@ export default function NewRequestPage() {
     setSearching(true);
     setLookupMessage('');
     try {
-      const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
-      const settings = settingsSnap.exists() ? settingsSnap.data() : null;
+      let settings = null;
+
+      if (db) {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+        settings = settingsSnap.exists() ? settingsSnap.data() : null;
+      }
+
+      const directPatient = await lookupPatientFromSheet(
+        settings,
+        formData.historyNumber,
+        formData.personalId,
+      );
+
+      if (directPatient) {
+        setFormData((prev) => ({
+          ...prev,
+          ...directPatient,
+        }));
+        setLookupMessage('პაციენტის ინფორმაცია წარმატებით ჩაიტვირთა.');
+        return;
+      }
 
       const response = await fetch('/api/external/lookup', {
         method: 'POST',
@@ -59,7 +79,7 @@ export default function NewRequestPage() {
 
       if (response.ok) {
         const patient = await response.json();
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           ...patient
         }));

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import cors from "cors";
 import { google } from "googleapis";
+import * as XLSX from "xlsx";
 import { DEFAULT_SYSTEM_SETTINGS } from "./src/defaultSystemSettings";
 import { SystemSettings } from "./src/types";
 
@@ -26,7 +27,7 @@ function getGoogleAuthClient() {
 }
 
 function mergeSystemSettings(input: Partial<SystemSettings> | null | undefined): SystemSettings {
-  return {
+  const mergedSettings: SystemSettings = {
     ...DEFAULT_SYSTEM_SETTINGS,
     ...input,
     columnMapping: {
@@ -34,6 +35,20 @@ function mergeSystemSettings(input: Partial<SystemSettings> | null | undefined):
       ...(input?.columnMapping || {}),
     },
   };
+
+  const spreadsheetId = extractSpreadsheetId(mergedSettings.googleSheetsId);
+  const defaultSpreadsheetId = extractSpreadsheetId(DEFAULT_SYSTEM_SETTINGS.googleSheetsId);
+
+  if (spreadsheetId === defaultSpreadsheetId) {
+    return {
+      ...mergedSettings,
+      sheetName: DEFAULT_SYSTEM_SETTINGS.sheetName,
+      sheetGid: DEFAULT_SYSTEM_SETTINGS.sheetGid,
+      columnMapping: { ...DEFAULT_SYSTEM_SETTINGS.columnMapping },
+    };
+  }
+
+  return mergedSettings;
 }
 
 function extractSpreadsheetId(value: string) {
@@ -58,6 +73,18 @@ function normalizeHeader(value: string | undefined) {
 
 function normalizeLookupValue(value: string | undefined) {
   return (value || "").trim();
+}
+
+function normalizeSpreadsheetValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? String(value) : String(value).replace(/\.0+$/, "");
+  }
+
+  return String(value).trim().replace(/\.0+$/, "");
 }
 
 function findColumnIndex(headers: string[], columnName: string) {
@@ -132,6 +159,31 @@ async function fetchPublicSheetRows(settings: SystemSettings) {
   return parseCsv(csvText);
 }
 
+async function fetchWorkbookSheetRows(settings: SystemSettings) {
+  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Workbook fetch failed with status ${response.status}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheetName = settings.sheetName?.trim() || DEFAULT_SYSTEM_SETTINGS.sheetName;
+
+  if (!sheetName || !workbook.SheetNames.includes(sheetName)) {
+    throw new Error(`Sheet not found: ${sheetName || "unknown"}`);
+  }
+
+  const worksheet = workbook.Sheets[sheetName];
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+    header: "A",
+    defval: "",
+    raw: false,
+  });
+}
+
 async function fetchGoogleApiRows(settings: SystemSettings) {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
@@ -147,11 +199,59 @@ async function fetchGoogleApiRows(settings: SystemSettings) {
 
 async function fetchSheetRows(settings: SystemSettings) {
   try {
+    return await fetchWorkbookSheetRows(settings);
+  } catch (workbookError) {
+    console.warn("Workbook fetch failed, falling back to public CSV/API.", workbookError);
+  }
+
+  try {
     return await fetchPublicSheetRows(settings);
   } catch (publicError) {
     console.warn("Public sheet fetch failed, falling back to Google Sheets API.", publicError);
     return await fetchGoogleApiRows(settings);
   }
+}
+
+function mapPatientFromWorkbookRows(
+  rows: Record<string, unknown>[],
+  settings: SystemSettings,
+  historyNumber: string,
+  personalId: string,
+) {
+  if (!rows.length) {
+    return null;
+  }
+
+  const normalizedHistoryNumber = normalizeLookupValue(historyNumber);
+  const normalizedPersonalId = normalizeLookupValue(personalId);
+  const firstNameColumn = settings.columnMapping.firstName || "C";
+  const lastNameColumn = settings.columnMapping.lastName || "B";
+  const historyNumberColumn = settings.columnMapping.historyNumber || "F";
+  const personalIdColumn = settings.columnMapping.personalId || "D";
+
+  const patientRow = rows.find((row) => {
+    const rowHistoryNumber = normalizeSpreadsheetValue(row[historyNumberColumn]);
+    const rowPersonalId = normalizeSpreadsheetValue(row[personalIdColumn]);
+
+    return (
+      (normalizedHistoryNumber && rowHistoryNumber === normalizedHistoryNumber) ||
+      (normalizedPersonalId && rowPersonalId === normalizedPersonalId)
+    );
+  });
+
+  if (!patientRow) {
+    return null;
+  }
+
+  return {
+    firstName: normalizeSpreadsheetValue(patientRow[firstNameColumn]),
+    lastName: normalizeSpreadsheetValue(patientRow[lastNameColumn]),
+    historyNumber: normalizeSpreadsheetValue(patientRow[historyNumberColumn]),
+    personalId: normalizeSpreadsheetValue(patientRow[personalIdColumn]),
+    birthDate: "",
+    phone: "",
+    address: "",
+  };
 }
 
 function mapPatientFromSheet(rows: string[][], settings: SystemSettings, historyNumber: string, personalId: string) {
@@ -245,7 +345,9 @@ async function startServer() {
 
     try {
       const rows = await fetchSheetRows(settings);
-      const patient = mapPatientFromSheet(rows, settings, historyNumber, personalId);
+      const patient = Array.isArray(rows[0])
+        ? mapPatientFromSheet(rows as string[][], settings, historyNumber, personalId)
+        : mapPatientFromWorkbookRows(rows as Record<string, unknown>[], settings, historyNumber, personalId);
 
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
