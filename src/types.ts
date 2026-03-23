@@ -25,6 +25,7 @@ export interface ClinicalRequest {
   patientData: Patient;
   createdByUserId: string;
   createdByUserName: string;
+  createdByUserEmail?: string;
   requestedAction: string;
   studyType?: string;
   department?: string;

@@ -15,6 +15,18 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function getRequestTimestampValue(request: ClinicalRequest) {
+  if (request.createdAt?.toMillis) {
+    return request.createdAt.toMillis();
+  }
+
+  if (request.createdAt?.seconds) {
+    return request.createdAt.seconds * 1000;
+  }
+
+  return 0;
+}
+
 export default function Dashboard() {
   const { profile, isDoctorOrNurse, isRegistrar, isAdmin } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
@@ -24,22 +36,92 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!profile) return;
-
-    let q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
-
-    if (isDoctorOrNurse && !isAdmin) {
-      q = query(collection(db, 'requests'), where('createdByUserId', '==', profile.uid), orderBy('createdAt', 'desc'));
+    if (!profile) {
+      return;
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClinicalRequest));
-      setRequests(docs);
-      setLoading(false);
-    }, (error) => {
-      console.error("Firestore Error:", error);
-      setLoading(false);
-    });
+    setLoading(true);
+
+    if (isDoctorOrNurse && !isAdmin) {
+      const requestsByUid = new Map<string, ClinicalRequest>();
+      const requestsByEmail = new Map<string, ClinicalRequest>();
+      let uidLoaded = false;
+      let emailLoaded = !profile.email;
+
+      const syncRequests = () => {
+        const merged = new Map<string, ClinicalRequest>([
+          ...requestsByUid.entries(),
+          ...requestsByEmail.entries(),
+        ]);
+
+        const sorted = Array.from(merged.values()).sort(
+          (left, right) => getRequestTimestampValue(right) - getRequestTimestampValue(left),
+        );
+
+        setRequests(sorted);
+
+        if (uidLoaded && emailLoaded) {
+          setLoading(false);
+        }
+      };
+
+      const unsubscribeByUid = onSnapshot(
+        query(collection(db, 'requests'), where('createdByUserId', '==', profile.uid)),
+        (snapshot) => {
+          requestsByUid.clear();
+          snapshot.docs.forEach((requestDoc) => {
+            requestsByUid.set(requestDoc.id, { id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest);
+          });
+          uidLoaded = true;
+          syncRequests();
+        },
+        (error) => {
+          console.error('Firestore Error:', error);
+          uidLoaded = true;
+          syncRequests();
+        },
+      );
+
+      const unsubscribers = [unsubscribeByUid];
+
+      if (profile.email) {
+        const unsubscribeByEmail = onSnapshot(
+          query(collection(db, 'requests'), where('createdByUserEmail', '==', profile.email)),
+          (snapshot) => {
+            requestsByEmail.clear();
+            snapshot.docs.forEach((requestDoc) => {
+              requestsByEmail.set(requestDoc.id, { id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest);
+            });
+            emailLoaded = true;
+            syncRequests();
+          },
+          (error) => {
+            console.error('Firestore Error:', error);
+            emailLoaded = true;
+            syncRequests();
+          },
+        );
+
+        unsubscribers.push(unsubscribeByEmail);
+      }
+
+      return () => {
+        unsubscribers.forEach((unsubscribe) => unsubscribe());
+      };
+    }
+
+    const unsubscribe = onSnapshot(
+      query(collection(db, 'requests'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        const docs = snapshot.docs.map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest));
+        setRequests(docs);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Firestore Error:', error);
+        setLoading(false);
+      },
+    );
 
     return unsubscribe;
   }, [profile, isDoctorOrNurse, isAdmin]);

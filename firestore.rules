@@ -58,8 +58,24 @@ service cloud.firestore {
       return hasRole('doctor') || hasRole('nurse');
     }
 
+    function requestBelongsToCurrentUser(requestData) {
+      return isAuthenticated() && (
+        requestData.createdByUserId == request.auth.uid ||
+        (
+          request.auth.token.email != null &&
+          requestData.createdByUserEmail == request.auth.token.email
+        )
+      );
+    }
+
     function isRequestOwner() {
-      return isAuthenticated() && resource.data.createdByUserId == request.auth.uid;
+      return requestBelongsToCurrentUser(resource.data);
+    }
+
+    function newRequestBelongsToCurrentUser() {
+      return request.auth.token.email != null &&
+        request.resource.data.createdByUserId == request.auth.uid &&
+        request.resource.data.createdByUserEmail == request.auth.token.email;
     }
 
     function ownUserProfileMatchesAllowedRole(userId) {
@@ -81,7 +97,9 @@ service cloud.firestore {
         isRegistrar() ||
         isRequestOwner()
       );
-      allow create: if isAllowedEmail() && (isDoctorOrNurse() || isAdmin());
+      allow create: if isAllowedEmail() &&
+        (isDoctorOrNurse() || isAdmin()) &&
+        newRequestBelongsToCurrentUser();
       allow update: if isAllowedEmail() && (
         isRegistrar() ||
         isAdmin() ||

@@ -131,6 +131,7 @@ export default function NewRequestPage() {
         },
         createdByUserId: profile.uid,
         createdByUserName: profile.fullName,
+        createdByUserEmail: profile.email,
         requestedAction: formData.requestedAction,
         department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
         studyType: formData.studyType,
