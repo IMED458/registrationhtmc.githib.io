@@ -12,6 +12,12 @@ service cloud.firestore {
         request.auth.token.email_verified == true;
     }
 
+    function isPasswordProvider() {
+      return isAuthenticated() &&
+        request.auth.token.firebase != null &&
+        request.auth.token.firebase.sign_in_provider == "password";
+    }
+
     function emailRole() {
       return request.auth.token.email == "imedashviligio27@gmail.com" ? "admin" :
         request.auth.token.email == "eringorokva@gmail.com" ? "doctor" :
@@ -20,7 +26,10 @@ service cloud.firestore {
     }
 
     function isAllowedEmail() {
-      return isVerifiedEmail() && emailRole() != "";
+      return isAuthenticated() &&
+        request.auth.token.email != null &&
+        emailRole() != "" &&
+        (isVerifiedEmail() || isPasswordProvider());
     }
 
     function hasUserProfile() {
