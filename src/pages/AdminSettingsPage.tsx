@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { REGISTRAR_EMAIL } from '../accessControl';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { DEFAULT_SYSTEM_SETTINGS } from '../defaultSystemSettings';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
-import { SystemSettings, AuditLog } from '../types';
+import { SystemSettings, AuditLog, ClinicalRequest } from '../types';
 import { CheckCircle2, Database, History, Loader2, Save, ShieldOff, Trash2, Undo2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
 function mergeSystemSettings(input?: Partial<SystemSettings> | null): SystemSettings {
   return {
@@ -25,11 +26,14 @@ function mergeSystemSettings(input?: Partial<SystemSettings> | null): SystemSett
 
 export default function AdminSettingsPage() {
   const { isAdmin, profile } = useAuth();
+  const navigate = useNavigate();
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<ClinicalRequest[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [registrarSaving, setRegistrarSaving] = useState(false);
+  const [confirmingRequestId, setConfirmingRequestId] = useState('');
   const isRegistrarDeleted = (settings.disabledEmails ?? []).includes(REGISTRAR_EMAIL);
 
   useEffect(() => {
@@ -43,12 +47,26 @@ export default function AdminSettingsPage() {
     };
 
     const q = query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeLogs = onSnapshot(q, (snapshot) => {
       setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog)));
     });
 
+    const unsubscribeRequests = onSnapshot(
+      query(collection(db, 'requests'), orderBy('updatedAt', 'desc'), limit(50)),
+      (snapshot) => {
+        const nextRequests = snapshot.docs
+          .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
+          .filter((request) => request.adminConfirmationStatus === 'pending' && request.pendingRegistrarUpdate);
+
+        setPendingApprovals(nextRequests);
+      },
+    );
+
     fetchSettings();
-    return unsubscribe;
+    return () => {
+      unsubscribeLogs();
+      unsubscribeRequests();
+    };
   }, [isAdmin]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -135,6 +153,53 @@ export default function AdminSettingsPage() {
       );
     } finally {
       setRegistrarSaving(false);
+    }
+  };
+
+  const handleConfirmEditedRequest = async (request: ClinicalRequest) => {
+    if (!profile || confirmingRequestId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `"${request.patientData.firstName} ${request.patientData.lastName}" ჩანაწერის რედაქტირება დადასტურდეს?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setConfirmingRequestId(request.id);
+
+    try {
+      await updateDoc(doc(db, 'requests', request.id), {
+        adminConfirmationStatus: 'confirmed',
+        adminConfirmedAt: Timestamp.now(),
+        adminConfirmedByUserId: profile.uid,
+        adminConfirmedByUserName: profile.fullName,
+        pendingRegistrarUpdate: null,
+        updatedAt: Timestamp.now(),
+      });
+
+      await writeAuditLogEntry({
+        userId: profile.uid,
+        userName: profile.fullName,
+        requestId: request.id,
+        actionType: 'UPDATE_CONFIRMED',
+        newValue: `ადმინისტრატორმა დაადასტურა ჩანაწერის რედაქტირება: ${request.patientData.firstName} ${request.patientData.lastName}`,
+        oldValue: request.pendingRegistrarUpdate?.registrarComment || undefined,
+      });
+    } catch (err) {
+      console.error(err);
+      alert(
+        getFirebaseActionErrorMessage(err, {
+          fallback: 'რედაქტირების დადასტურება ვერ მოხერხდა.',
+          permissionDenied:
+            'დადასტურება ვერ მოხერხდა, რადგან ამ ანგარიშისთვის ადმინისტრატორის write წვდომა არ არის ნებადართული.',
+        }),
+      );
+    } finally {
+      setConfirmingRequestId('');
     }
   };
 
@@ -261,6 +326,72 @@ export default function AdminSettingsPage() {
               <p className="text-xs text-slate-400">
                 წაშლის შემდეგ რეგისტრატორის ანგარიში სისტემაში ვეღარ შევა, სანამ ადმინისტრატორი ხელახლა არ აღადგენს.
               </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-amber-600" />
+              <h3 className="font-bold text-slate-700">ნებართვების ველი</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                აქ ჩანს რეგისტრატორის მიერ შეცვლილი ჩანაწერები, რომლებიც ადმინისტრატორის დადასტურებას ელოდება.
+              </p>
+
+              {pendingApprovals.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
+                  დასადასტურებელი რედაქტირება ამჟამად არ არის.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingApprovals.map((request) => (
+                    <div key={request.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <div className="text-sm font-black text-slate-900">
+                            {request.patientData.firstName} {request.patientData.lastName}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {request.patientData.historyNumber} / {request.patientData.personalId}
+                          </div>
+                          <div className="text-sm font-bold text-amber-800">
+                            {request.currentStatus}
+                            {request.finalDecision ? ` / ${request.finalDecision}` : ''}
+                          </div>
+                          <div className="text-sm text-slate-700">
+                            რედაქტორი: {request.lastRegistrarEditByUserName || request.pendingRegistrarUpdate?.requestedByUserName || 'რეგისტრატორი'}
+                          </div>
+                          <div className="text-sm text-slate-700">
+                            კომენტარი: {request.registrarComment || request.pendingRegistrarUpdate?.registrarComment || '-'}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            რედაქტირდა: {request.lastRegistrarEditAt?.toDate ? format(request.lastRegistrarEditAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka }) : '-'}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:w-[280px]">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/request/${request.id}`)}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            დეტალები
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmEditedRequest(request)}
+                            disabled={confirmingRequestId === request.id}
+                            className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {confirmingRequestId === request.id ? 'ინახება...' : 'დადასტურება'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

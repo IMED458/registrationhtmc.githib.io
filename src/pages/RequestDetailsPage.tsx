@@ -12,7 +12,7 @@ import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User 
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 
-type ConfirmAction = 'save' | 'request' | 'approve' | 'reject' | null;
+type ConfirmAction = 'save' | 'approve' | null;
 
 function getUpdateSummary(status: string, finalDecision?: string) {
   return `${status}${finalDecision ? ` / ${finalDecision}` : ''}`;
@@ -46,6 +46,7 @@ function hasRegistrarSyncChange(current: ClinicalRequest, next: ClinicalRequest)
     (current.registrarComment || '') !== (next.registrarComment || '') ||
     (current.registrarName || '') !== (next.registrarName || '') ||
     (current.formFillerName || '') !== (next.formFillerName || '') ||
+    (current.adminConfirmationStatus || '') !== (next.adminConfirmationStatus || '') ||
     getPendingUpdateSignature(current.pendingRegistrarUpdate) !==
       getPendingUpdateSignature(next.pendingRegistrarUpdate)
   );
@@ -70,6 +71,7 @@ export default function RequestDetailsPage() {
     message: string;
   } | null>(null);
   const [syncNoticeMessage, setSyncNoticeMessage] = useState('');
+  const [formError, setFormError] = useState('');
   const autoStatusSyncRef = useRef(false);
 
   const [formData, setFormData] = useState({
@@ -81,7 +83,9 @@ export default function RequestDetailsPage() {
   });
 
   const isRegistrarOnly = isRegistrar && !isAdmin;
-  const pendingUpdate = request?.pendingRegistrarUpdate || null;
+  const pendingUpdate = request?.adminConfirmationStatus === 'pending'
+    ? request?.pendingRegistrarUpdate || null
+    : null;
 
   useEffect(() => {
     if (!id || !profile || !request || !isRegistrarOnly) {
@@ -143,17 +147,14 @@ export default function RequestDetailsPage() {
 
         setRequest((current) => {
           if (current && hasRegistrarSyncChange(current, nextRequest) && !updating && !confirmAction) {
-            const currentPendingSignature = getPendingUpdateSignature(current.pendingRegistrarUpdate);
-            const nextPendingSignature = getPendingUpdateSignature(nextRequest.pendingRegistrarUpdate);
-
-            if (currentPendingSignature !== nextPendingSignature) {
-              if (nextRequest.pendingRegistrarUpdate) {
-                setSyncNoticeMessage('ცვლილება ადმინთან დასადასტურებლად გაიგზავნა.');
-              } else {
-                setSyncNoticeMessage('ადმინმა რეგისტრატორის ცვლილების მოთხოვნა დაამუშავა.');
+            if (current.adminConfirmationStatus !== nextRequest.adminConfirmationStatus) {
+              if (nextRequest.adminConfirmationStatus === 'confirmed') {
+                setSyncNoticeMessage('ადმინმა რეგისტრატორის რედაქტირება დაადასტურა.');
+              } else if (nextRequest.adminConfirmationStatus === 'pending') {
+                setSyncNoticeMessage('რეგისტრატორის ცვლილება ჩაიწერა და ადმინთან შეტყობინება გაიგზავნა.');
               }
             } else {
-              setSyncNoticeMessage('რეგისტრატურის ცვლილება პირდაპირ ჩაიტვირთა.');
+              setSyncNoticeMessage('ჩანაწერი realtime რეჟიმში განახლდა.');
             }
           }
 
@@ -161,17 +162,13 @@ export default function RequestDetailsPage() {
         });
 
         if (!updating && !confirmAction) {
-          const source = isRegistrarOnly && data.pendingRegistrarUpdate
-            ? data.pendingRegistrarUpdate
-            : data;
-
           setFormData((current) => ({
             ...current,
-            currentStatus: source.currentStatus || data.currentStatus,
-            finalDecision: source.finalDecision || '',
-            registrarComment: source.registrarComment || '',
-            registrarName: source.registrarName || profile?.fullName || '',
-            formFillerName: source.formFillerName || profile?.fullName || '',
+            currentStatus: data.currentStatus,
+            finalDecision: data.finalDecision || '',
+            registrarComment: data.registrarComment || '',
+            registrarName: data.registrarName || profile?.fullName || '',
+            formFillerName: data.formFillerName || profile?.fullName || '',
           }));
         }
 
@@ -184,7 +181,7 @@ export default function RequestDetailsPage() {
     );
 
     return unsubscribe;
-  }, [confirmAction, id, isRegistrarOnly, profile?.fullName, updating]);
+  }, [confirmAction, id, profile?.fullName, updating]);
 
   useEffect(() => {
     if (!profile || (!isRegistrar && !isAdmin)) {
@@ -202,7 +199,6 @@ export default function RequestDetailsPage() {
     new Set([
       ...REQUEST_STATUSES.filter((status) => status !== 'უარყოფილია'),
       ...(formData.currentStatus ? [formData.currentStatus] : []),
-      ...(pendingUpdate?.currentStatus ? [pendingUpdate.currentStatus] : []),
     ]),
   );
 
@@ -210,7 +206,6 @@ export default function RequestDetailsPage() {
     new Set([
       ...FINAL_DECISIONS.filter((decision) => decision !== 'გაუქმებულია'),
       ...(formData.finalDecision ? [formData.finalDecision] : []),
-      ...(pendingUpdate?.finalDecision ? [pendingUpdate.finalDecision] : []),
     ]),
   );
 
@@ -220,7 +215,13 @@ export default function RequestDetailsPage() {
       return;
     }
 
-    setConfirmAction(isRegistrarOnly ? 'request' : 'save');
+    if (isRegistrarOnly && !formData.registrarComment.trim()) {
+      setFormError('რეგისტრატორის ცვლილების შესანახად კომენტარი სავალდებულოა.');
+      return;
+    }
+
+    setFormError('');
+    setConfirmAction('save');
   };
 
   const handleApprovePendingUpdate = () => {
@@ -229,14 +230,6 @@ export default function RequestDetailsPage() {
     }
 
     setConfirmAction('approve');
-  };
-
-  const handleRejectPendingUpdate = () => {
-    if (!pendingUpdate) {
-      return;
-    }
-
-    setConfirmAction('reject');
   };
 
   const submitUpdate = async () => {
@@ -249,11 +242,47 @@ export default function RequestDetailsPage() {
     try {
       const requestRef = doc(db, 'requests', id);
 
-      if (confirmAction === 'request') {
-        const nextPendingUpdate: PendingRegistrarUpdate = {
+      if (confirmAction === 'approve' && pendingUpdate) {
+        await updateDoc(requestRef, {
+          adminConfirmationStatus: 'confirmed',
+          adminConfirmedAt: Timestamp.now(),
+          adminConfirmedByUserId: profile.uid,
+          adminConfirmedByUserName: profile.fullName,
+          pendingRegistrarUpdate: null,
+          updatedAt: Timestamp.now(),
+        });
+
+        await writeAuditLogEntry({
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: id,
+          actionType: 'UPDATE_CONFIRMED',
+          oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
+          newValue: 'ადმინისტრატორმა დაადასტურა რეგისტრატორის რედაქტირება',
+        });
+
+        setConfirmAction(null);
+        setSuccessDialogContent({
+          title: 'რედაქტირება დადასტურდა',
+          message: 'რეგისტრატორის ცვლილება უკვე დადასტურებულია ადმინისტრატორის მიერ.',
+        });
+        return;
+      }
+
+      const baseUpdate = {
+        currentStatus: formData.currentStatus,
+        finalDecision: formData.finalDecision,
+        registrarComment: formData.registrarComment.trim(),
+        registrarName: formData.registrarName,
+        formFillerName: formData.formFillerName,
+        updatedAt: Timestamp.now(),
+      };
+
+      if (isRegistrarOnly) {
+        const pendingNotification: PendingRegistrarUpdate = {
           currentStatus: formData.currentStatus as ClinicalRequest['currentStatus'],
           finalDecision: formData.finalDecision,
-          registrarComment: formData.registrarComment,
+          registrarComment: formData.registrarComment.trim(),
           registrarName: formData.registrarName,
           formFillerName: formData.formFillerName,
           requestedAt: Timestamp.now(),
@@ -263,91 +292,48 @@ export default function RequestDetailsPage() {
         };
 
         await updateDoc(requestRef, {
-          pendingRegistrarUpdate: nextPendingUpdate,
-          updatedAt: Timestamp.now(),
+          ...baseUpdate,
+          pendingRegistrarUpdate: pendingNotification,
+          lastRegistrarEditAt: Timestamp.now(),
+          lastRegistrarEditByUserId: profile.uid,
+          lastRegistrarEditByUserName: profile.fullName,
+          lastRegistrarEditByUserEmail: profile.email,
+          adminConfirmationStatus: 'pending',
+          adminConfirmedAt: null,
+          adminConfirmedByUserId: '',
+          adminConfirmedByUserName: '',
         });
 
         await writeAuditLogEntry({
           userId: profile.uid,
           userName: profile.fullName,
           requestId: id,
-          actionType: 'UPDATE_REQUESTED',
+          actionType: 'REGISTRAR_EDIT',
           oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-          newValue: getUpdateSummary(nextPendingUpdate.currentStatus, nextPendingUpdate.finalDecision),
+          newValue: `${getUpdateSummary(formData.currentStatus, formData.finalDecision)} / კომენტარი: ${formData.registrarComment.trim()}`,
         });
 
         setConfirmAction(null);
         setSuccessDialogContent({
-          title: 'ცვლილება ადმინთან გაიგზავნა',
-          message: 'რეგისტრატორის მოთხოვნილი განახლება შენახულია და ადმინის დადასტურებას ელოდება.',
+          title: 'ცვლილება შენახულია',
+          message: 'ჩანაწერი დარედაქტირდა და ადმინისტრატორთან შეტყობინება ავტომატურად გაიგზავნა.',
         });
         return;
       }
 
-      if (confirmAction === 'approve' && pendingUpdate) {
-        const approvedUpdate = {
-          currentStatus: pendingUpdate.currentStatus,
-          finalDecision: pendingUpdate.finalDecision || '',
-          registrarComment: pendingUpdate.registrarComment || '',
-          registrarName: pendingUpdate.registrarName || '',
-          formFillerName: pendingUpdate.formFillerName || '',
-          pendingRegistrarUpdate: null,
-          updatedAt: Timestamp.now(),
-        };
-
-        await updateDoc(requestRef, approvedUpdate);
-
-        await writeAuditLogEntry({
-          userId: profile.uid,
-          userName: profile.fullName,
-          requestId: id,
-          actionType: 'UPDATE_APPROVED',
-          oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-          newValue: getUpdateSummary(pendingUpdate.currentStatus, pendingUpdate.finalDecision),
-        });
-
-        setConfirmAction(null);
-        setSuccessDialogContent({
-          title: 'ცვლილება დამტკიცდა',
-          message: 'რეგისტრატორის მოთხოვნილი განახლება დამტკიცდა და მთავარ პანელზეც აისახა.',
-        });
-        return;
-      }
-
-      if (confirmAction === 'reject' && pendingUpdate) {
-        await updateDoc(requestRef, {
-          pendingRegistrarUpdate: null,
-          updatedAt: Timestamp.now(),
-        });
-
-        await writeAuditLogEntry({
-          userId: profile.uid,
-          userName: profile.fullName,
-          requestId: id,
-          actionType: 'UPDATE_REJECTED',
-          oldValue: getUpdateSummary(pendingUpdate.currentStatus, pendingUpdate.finalDecision),
-          newValue: 'ადმინმა უარყო რეგისტრატორის ცვლილების მოთხოვნა',
-        });
-
-        setConfirmAction(null);
-        setSuccessDialogContent({
-          title: 'ცვლილება უარყოფილია',
-          message: 'რეგისტრატორის მოთხოვნილი განახლება გაუქმდა და ჩანაწერი დარჩა ძველი მნიშვნელობებით.',
-        });
-        return;
-      }
-
-      const updateData = {
-        currentStatus: formData.currentStatus,
-        finalDecision: formData.finalDecision,
-        registrarComment: formData.registrarComment,
-        registrarName: formData.registrarName,
-        formFillerName: formData.formFillerName,
-        pendingRegistrarUpdate: null,
-        updatedAt: Timestamp.now(),
+      const adminUpdateData: Record<string, any> = {
+        ...baseUpdate,
       };
 
-      await updateDoc(requestRef, updateData);
+      if (request.adminConfirmationStatus === 'pending' || request.pendingRegistrarUpdate) {
+        adminUpdateData.pendingRegistrarUpdate = null;
+        adminUpdateData.adminConfirmationStatus = 'confirmed';
+        adminUpdateData.adminConfirmedAt = Timestamp.now();
+        adminUpdateData.adminConfirmedByUserId = profile.uid;
+        adminUpdateData.adminConfirmedByUserName = profile.fullName;
+      }
+
+      await updateDoc(requestRef, adminUpdateData);
 
       await writeAuditLogEntry({
         userId: profile.uid,
@@ -367,13 +353,9 @@ export default function RequestDetailsPage() {
       console.error('Update error:', err);
 
       const fallbackMessage =
-        confirmAction === 'request'
-          ? 'ცვლილების ადმინთან გაგზავნა ვერ მოხერხდა.'
-          : confirmAction === 'approve'
-            ? 'ცვლილების დადასტურება ვერ მოხერხდა.'
-            : confirmAction === 'reject'
-              ? 'ცვლილების უარყოფა ვერ მოხერხდა.'
-              : 'განახლება ვერ მოხერხდა.';
+        confirmAction === 'approve'
+          ? 'რედაქტირების დადასტურება ვერ მოხერხდა.'
+          : 'განახლება ვერ მოხერხდა.';
 
       alert(
         getFirebaseActionErrorMessage(err, {
@@ -389,30 +371,14 @@ export default function RequestDetailsPage() {
 
   const confirmDialogContent = confirmAction
     ? {
-        title:
-          confirmAction === 'request'
-            ? 'ადმინთან გაგზავნა'
-            : confirmAction === 'approve'
-              ? 'ცვლილების დადასტურება'
-              : confirmAction === 'reject'
-                ? 'ცვლილების უარყოფა'
-                : 'სტატუსის დადასტურება',
+        title: confirmAction === 'approve' ? 'რედაქტირების დადასტურება' : 'სტატუსის დადასტურება',
         message:
-          confirmAction === 'request'
-            ? 'რეგისტრატორის ცვლილება ჯერ ადმინთან დასადასტურებლად გაიგზავნება. გაგრძელება გსურთ?'
-            : confirmAction === 'approve'
-              ? 'ნამდვილად გსურთ რეგისტრატორის მოთხოვნილი ცვლილების დადასტურება?'
-              : confirmAction === 'reject'
-                ? 'ნამდვილად გსურთ რეგისტრატორის მოთხოვნილი ცვლილების უარყოფა?'
-                : 'ნამდვილად გსურთ სტატუსის განახლება?',
-        confirmLabel:
-          confirmAction === 'request'
-            ? 'გაგზავნა'
-            : confirmAction === 'approve'
-              ? 'დადასტურება'
-              : confirmAction === 'reject'
-                ? 'უარყოფა'
-                : 'OK',
+          confirmAction === 'approve'
+            ? 'ნამდვილად გსურთ რეგისტრატორის მიერ შეტანილი ცვლილების დადასტურება?'
+            : isRegistrarOnly
+              ? 'ცვლილება დაუყოვნებლივ შეინახება და ადმინთან შეტყობინებაც გაიგზავნება. გაგრძელება გსურთ?'
+              : 'ნამდვილად გსურთ სტატუსის განახლება?',
+        confirmLabel: confirmAction === 'approve' ? 'დადასტურება' : 'OK',
       }
     : null;
 
@@ -536,7 +502,7 @@ export default function RequestDetailsPage() {
             </div>
           </div>
 
-          {(request.registrarName || request.formFillerName) && (
+          {(request.registrarName || request.formFillerName || request.lastRegistrarEditAt) && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-blue-600" />
@@ -551,6 +517,22 @@ export default function RequestDetailsPage() {
                   <div className="text-xs text-slate-400 uppercase font-bold">ფურცლის შემვსები</div>
                   <div className="font-bold text-slate-900">{request.formFillerName || '-'}</div>
                 </div>
+                <div>
+                  <div className="text-xs text-slate-400 uppercase font-bold">ჩანაწერი რედაქტირდა</div>
+                  <div className="font-bold text-slate-900">
+                    {request.lastRegistrarEditAt ? getDateTimeLabel(request.lastRegistrarEditAt) : '-'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 uppercase font-bold">ადმინის დადასტურება</div>
+                  <div className={`font-bold ${request.adminConfirmationStatus === 'pending' ? 'text-amber-700' : request.adminConfirmationStatus === 'confirmed' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {request.adminConfirmationStatus === 'pending'
+                      ? 'ელოდება დადასტურებას'
+                      : request.adminConfirmationStatus === 'confirmed'
+                        ? 'დადასტურებულია'
+                        : '-'}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -561,18 +543,18 @@ export default function RequestDetailsPage() {
             <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
               <div className="border-b border-amber-200 px-6 py-3 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-amber-900">ადმინის დასადასტურებელი ცვლილება</h3>
+                <h3 className="font-bold text-amber-900">ადმინისტრატორის შეტყობინება</h3>
               </div>
               <div className="space-y-4 p-4 sm:p-6">
                 <p className="text-sm leading-6 text-amber-900">
                   {isAdmin
-                    ? 'რეგისტრატორმა მოითხოვა სტატუსის ცვლილება. გადახედეთ და დაამტკიცეთ ან უარყავით.'
-                    : 'თქვენი ბოლო ცვლილება ადმინთან არის გაგზავნილი და დადასტურებას ელოდება.'}
+                    ? 'რეგისტრატორმა უკვე შეცვალა ჩანაწერი. აქედან ან ადმინისტრირების გვერდიდან შეგიძლიათ დადასტურება.'
+                    : 'თქვენი ცვლილება უკვე ჩაიწერა. ადმინისტრატორს დადასტურების შეტყობინება გაეგზავნა.'}
                 </p>
 
                 <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">მოთხოვნილი სტატუსი</div>
+                    <div className="text-xs font-bold uppercase text-amber-700">ახალი სტატუსი</div>
                     <div className="mt-1 font-bold text-slate-900">{pendingUpdate.currentStatus}</div>
                   </div>
                   <div>
@@ -580,51 +562,31 @@ export default function RequestDetailsPage() {
                     <div className="mt-1 font-bold text-slate-900">{pendingUpdate.finalDecision || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">რეგისტრატორი</div>
-                    <div className="mt-1 text-slate-700">{pendingUpdate.registrarName || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">ფურცლის შემვსები</div>
-                    <div className="mt-1 text-slate-700">{pendingUpdate.formFillerName || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">მომთხოვნი</div>
+                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტორი</div>
                     <div className="mt-1 text-slate-700">{pendingUpdate.requestedByUserName}</div>
                   </div>
                   <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">გაგზავნის დრო</div>
+                    <div className="text-xs font-bold uppercase text-amber-700">რედაქტირების დრო</div>
                     <div className="mt-1 text-slate-700">{getDateTimeLabel(pendingUpdate.requestedAt)}</div>
                   </div>
                 </div>
 
-                {pendingUpdate.registrarComment && (
-                  <div>
-                    <div className="text-xs font-bold uppercase text-amber-700">კომენტარი</div>
-                    <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
-                      {pendingUpdate.registrarComment}
-                    </div>
+                <div>
+                  <div className="text-xs font-bold uppercase text-amber-700">სავალდებულო კომენტარი</div>
+                  <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                    {pendingUpdate.registrarComment || '-'}
                   </div>
-                )}
+                </div>
 
                 {isAdmin && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={handleRejectPendingUpdate}
-                      disabled={updating}
-                      className="rounded-xl border border-red-200 bg-white px-4 py-3 font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                    >
-                      უარყოფა
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleApprovePendingUpdate}
-                      disabled={updating}
-                      className="rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      დადასტურება
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApprovePendingUpdate}
+                    disabled={updating}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    დადასტურება
+                  </button>
                 )}
               </div>
             </div>
@@ -639,9 +601,13 @@ export default function RequestDetailsPage() {
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
                 {isRegistrarOnly && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    {pendingUpdate
-                      ? 'ეს ვერსია უკვე ადმინთან არის გაგზავნილი. სურვილის შემთხვევაში შეგიძლიათ შეცვლილი ვერსია თავიდან გადააგზავნოთ.'
-                      : 'რეგისტრატორის მიერ შეტანილი ცვლილება ჯერ ადმინს ეგზავნება და მხოლოდ დადასტურების შემდეგ აისახება სისტემაში.'}
+                    ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.
+                  </div>
+                )}
+
+                {formError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {formError}
                   </div>
                 )}
 
@@ -694,7 +660,10 @@ export default function RequestDetailsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">რეგისტრატორის კომენტარი</label>
+                  <label className="text-sm font-bold text-slate-700">
+                    რეგისტრატორის კომენტარი
+                    {isRegistrarOnly && <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>}
+                  </label>
                   <textarea
                     rows={3}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
@@ -709,7 +678,7 @@ export default function RequestDetailsPage() {
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                  {isRegistrarOnly ? (pendingUpdate ? 'განახლებული ვერსიის გადაგზავნა' : 'ადმინთან გაგზავნა') : 'შენახვა'}
+                  შენახვა
                 </button>
               </form>
             </div>
@@ -733,6 +702,14 @@ export default function RequestDetailsPage() {
                 <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-slate-500">განახლდა:</span>
                   <span className="font-medium text-slate-700">{getDateTimeLabel(request.updatedAt)}</span>
+                </div>
+              )}
+              {request.lastRegistrarEditAt && (
+                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-slate-500">ბოლოს რედაქტირდა:</span>
+                  <span className="font-medium text-slate-700">
+                    {request.lastRegistrarEditByUserName || 'რეგისტრატორი'} / {getDateTimeLabel(request.lastRegistrarEditAt)}
+                  </span>
                 </div>
               )}
             </div>

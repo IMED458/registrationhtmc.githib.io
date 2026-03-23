@@ -47,11 +47,38 @@ service cloud.firestore {
       );
     }
 
-    function registrarTouchesOnlyPendingFields() {
+    function registrarDirectEditFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "currentStatus",
+        "finalDecision",
+        "registrarComment",
+        "registrarName",
+        "formFillerName",
         "pendingRegistrarUpdate",
+        "lastRegistrarEditAt",
+        "lastRegistrarEditByUserId",
+        "lastRegistrarEditByUserName",
+        "lastRegistrarEditByUserEmail",
+        "adminConfirmationStatus",
+        "adminConfirmedAt",
+        "adminConfirmedByUserId",
+        "adminConfirmedByUserName",
         "updatedAt"
       ]);
+    }
+
+    function registrarDirectEditPayloadIsValid() {
+      return request.resource.data.registrarComment is string &&
+        request.resource.data.registrarComment.size() > 0 &&
+        request.resource.data.lastRegistrarEditByUserId == request.auth.uid &&
+        request.resource.data.lastRegistrarEditByUserEmail == userEmail() &&
+        request.resource.data.adminConfirmationStatus == "pending" &&
+        request.resource.data.pendingRegistrarUpdate != null &&
+        request.resource.data.pendingRegistrarUpdate.currentStatus != null &&
+        request.resource.data.pendingRegistrarUpdate.registrarComment is string &&
+        request.resource.data.pendingRegistrarUpdate.registrarComment.size() > 0 &&
+        request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
+        request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
     }
 
     function registrarPendingUpdatePayloadIsValid() {
@@ -90,8 +117,8 @@ service cloud.firestore {
           (
             registrarCanMarkInReview() ||
             (
-              registrarTouchesOnlyPendingFields() &&
-              registrarPendingUpdatePayloadIsValid()
+              registrarDirectEditFieldsOnly() &&
+              registrarDirectEditPayloadIsValid()
             )
           )
         ) ||
