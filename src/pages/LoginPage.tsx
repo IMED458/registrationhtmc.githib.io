@@ -159,7 +159,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="imedashviligio27@gmail.com"
+                  placeholder="staff@clinic.local"
                   className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
