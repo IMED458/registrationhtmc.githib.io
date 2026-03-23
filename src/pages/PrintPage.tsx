@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { ClinicalRequest } from '../types';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
@@ -103,7 +104,7 @@ export default function PrintPage() {
 
           <div className="pt-4">
             <div className="text-[10px] font-black uppercase text-slate-500 mb-2">საბოლოო გადაწყვეტილება</div>
-            <div className="text-xl font-black bg-slate-100 p-4 rounded border-2 border-slate-900 text-center">
+            <div className={`text-xl font-black bg-slate-100 p-4 rounded border-2 border-slate-900 text-center ${getFinalDecisionTextClass(request.finalDecision)}`}>
               {request.finalDecision || 'განხილვის პროცესშია'}
             </div>
           </div>

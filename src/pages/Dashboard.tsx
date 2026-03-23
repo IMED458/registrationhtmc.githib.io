@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
 import { CheckCircle2, Clock, Filter, MoreHorizontal, Plus, Printer, Search, XCircle } from 'lucide-react';
@@ -271,7 +272,7 @@ export default function Dashboard() {
                           {req.currentStatus}
                         </span>
                         {req.finalDecision && (
-                          <div className="max-w-xs text-sm font-medium leading-5 text-slate-700 whitespace-normal">
+                          <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
                             {req.finalDecision}
                           </div>
                         )}
