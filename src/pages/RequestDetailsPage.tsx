@@ -12,6 +12,16 @@ import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User 
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 
+function hasRegistrarSyncChange(current: ClinicalRequest, next: ClinicalRequest) {
+  return (
+    current.currentStatus !== next.currentStatus ||
+    (current.finalDecision || '') !== (next.finalDecision || '') ||
+    (current.registrarComment || '') !== (next.registrarComment || '') ||
+    (current.registrarName || '') !== (next.registrarName || '') ||
+    (current.formFillerName || '') !== (next.formFillerName || '')
+  );
+}
+
 export default function RequestDetailsPage() {
   const { id } = useParams();
   const { profile, isRegistrar, isAdmin } = useAuth();
@@ -52,7 +62,7 @@ export default function RequestDetailsPage() {
         setRequest((current) => {
           if (
             current &&
-            current.currentStatus !== nextRequest.currentStatus &&
+            hasRegistrarSyncChange(current, nextRequest) &&
             !updating &&
             !showUpdateConfirm
           ) {
