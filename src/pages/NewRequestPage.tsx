@@ -20,8 +20,10 @@ export default function NewRequestPage() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [lookupMessage, setLookupMessage] = useState('');
+  const [patientLookupSource, setPatientLookupSource] = useState<'manual' | 'sheet'>('manual');
   const canCreateRequests = isAdmin || isDoctorOrNurse;
   const icdLookupRequestRef = useRef(0);
+  const requiresStructuredFields = patientLookupSource === 'sheet';
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
@@ -189,6 +191,7 @@ export default function NewRequestPage() {
           ...prev,
           ...directPatient,
         }));
+        setPatientLookupSource('sheet');
         setLookupMessage('პაციენტის ინფორმაცია წარმატებით ჩაიტვირთა.');
         return;
       }
@@ -196,7 +199,8 @@ export default function NewRequestPage() {
       const lookupApiUrl = resolveServerApiUrl('/api/external/lookup');
 
       if (!lookupApiUrl) {
-        setLookupMessage('პაციენტი ვერ მოიძებნა ან გარე წყარო ჯერ არ არის გამართული.');
+        setPatientLookupSource('manual');
+        setLookupMessage('პაციენტი ვერ მოიძებნა. შეგიძლიათ ფორმა ხელით შეავსოთ, ველები სავალდებულო არ არის.');
         return;
       }
 
@@ -216,13 +220,16 @@ export default function NewRequestPage() {
           ...prev,
           ...patient
         }));
+        setPatientLookupSource('sheet');
         setLookupMessage('პაციენტის ინფორმაცია წარმატებით ჩაიტვირთა.');
       } else {
-        setLookupMessage('პაციენტი ვერ მოიძებნა ან გარე წყარო ჯერ არ არის გამართული.');
+        setPatientLookupSource('manual');
+        setLookupMessage('პაციენტი ვერ მოიძებნა. შეგიძლიათ ფორმა ხელით შეავსოთ, ველები სავალდებულო არ არის.');
       }
     } catch (err) {
       console.error("Lookup error:", err);
-      setLookupMessage('პაციენტის მოძებნა ვერ მოხერხდა. შეგიძლიათ ველები ხელით შეავსოთ.');
+      setPatientLookupSource('manual');
+      setLookupMessage('პაციენტის მოძებნა ვერ მოხერხდა. შეგიძლიათ ფორმა ხელით შეავსოთ, ველები სავალდებულო არ არის.');
     } finally {
       setSearching(false);
     }
@@ -236,17 +243,17 @@ export default function NewRequestPage() {
       return;
     }
 
-    if (formData.requestedAction === 'სტაციონარი' && !formData.department.trim()) {
+    if (requiresStructuredFields && formData.requestedAction === 'სტაციონარი' && !formData.department.trim()) {
       setError('სტაციონარის მოთხოვნისთვის განყოფილება სავალდებულოა.');
       return;
     }
 
-    if (formData.requestedAction === 'კვლევა' && !formData.studyType.trim()) {
+    if (requiresStructuredFields && formData.requestedAction === 'კვლევა' && !formData.studyType.trim()) {
       setError('კვლევის მოთხოვნისთვის მიუთითეთ კვლევის ტიპი.');
       return;
     }
 
-    if (!formData.diagnosis.trim()) {
+    if (requiresStructuredFields && !formData.diagnosis.trim()) {
       setError('ICD-10 კოდის მიხედვით შეავსეთ დიაგნოზის განმარტება.');
       return;
     }
@@ -405,7 +412,7 @@ export default function NewRequestPage() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
-                    required
+                    required={requiresStructuredFields}
                     className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={formData.historyNumber}
                     onChange={(e) => setFormData({ ...formData, historyNumber: e.target.value })}
@@ -438,7 +445,7 @@ export default function NewRequestPage() {
                 <label className="text-sm font-bold text-slate-700">სახელი</label>
                 <input
                   type="text"
-                  required
+                  required={requiresStructuredFields}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
@@ -448,7 +455,7 @@ export default function NewRequestPage() {
                 <label className="text-sm font-bold text-slate-700">გვარი</label>
                 <input
                   type="text"
-                  required
+                  required={requiresStructuredFields}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
@@ -501,7 +508,7 @@ export default function NewRequestPage() {
                 <label className="text-sm font-bold text-slate-700">ICD-10 კოდი</label>
                 <input
                   type="text"
-                  required
+                  required={requiresStructuredFields}
                   placeholder="მაგ: R10.4"
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.icdCode}
@@ -535,7 +542,7 @@ export default function NewRequestPage() {
                 <label className="text-sm font-bold text-slate-700">დიაგნოზის განმარტება</label>
                 <input
                   type="text"
-                  required
+                  required={requiresStructuredFields}
                   placeholder="აირჩიეთ ICD-10 კოდი ან მოძებნეთ დიაგნოზით"
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.diagnosis}
