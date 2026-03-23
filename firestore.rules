@@ -124,6 +124,7 @@ service cloud.firestore {
         isAdmin() ||
         (isDoctorOrNurse() && isRequestOwner() && resource.data.currentStatus == 'ახალი')
       );
+      allow delete: if isAllowedEmail() && isAdmin();
     }
 
     match /audit_logs/{logId} {

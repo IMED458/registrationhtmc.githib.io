@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { writeAuditLogEntry } from '../auditLog';
+import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
-import { CheckCircle2, Clock, Filter, MoreHorizontal, Plus, Printer, Search, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Filter, Loader2, MoreHorizontal, Plus, Printer, Search, Trash2, XCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
@@ -54,6 +56,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ყველა');
+  const [deletingRequestId, setDeletingRequestId] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -183,6 +187,49 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteRequest = async (request: ClinicalRequest) => {
+    if (!isAdmin || !profile || !db || deletingRequestId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `ნამდვილად გსურთ "${request.patientData.firstName} ${request.patientData.lastName}" ჩანაწერის წაშლა მთავარი პანელიდან?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingRequestId(request.id);
+    setFeedbackMessage('');
+
+    try {
+      await deleteDoc(doc(db, 'requests', request.id));
+
+      await writeAuditLogEntry({
+        userId: profile.uid,
+        userName: profile.fullName,
+        requestId: request.id,
+        actionType: 'DELETE',
+        oldValue: `${request.currentStatus}${request.finalDecision ? ` / ${request.finalDecision}` : ''}`,
+        newValue: `წაიშალა მოთხოვნა: ${request.patientData.firstName} ${request.patientData.lastName}`,
+      });
+
+      setFeedbackMessage('ჩანაწერი წარმატებით წაიშალა.');
+    } catch (error) {
+      console.error('Delete request error:', error);
+      alert(
+        getFirebaseActionErrorMessage(error, {
+          fallback: 'ჩანაწერის წაშლა ვერ მოხერხდა.',
+          permissionDenied:
+            'წაშლა ვერ მოხერხდა, რადგან ამ ანგარიშისთვის delete წვდომა არ არის ნებადართული.',
+        }),
+      );
+    } finally {
+      setDeletingRequestId('');
+    }
+  };
+
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -231,6 +278,12 @@ export default function Dashboard() {
           </select>
         </div>
       </div>
+
+      {feedbackMessage && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {feedbackMessage}
+        </div>
+      )}
 
       <div className="space-y-4 md:hidden">
         {loading ? (
@@ -299,7 +352,7 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className={`mt-4 grid gap-3 ${isAdmin ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <button
                   onClick={() => navigate(`/request/${req.id}`)}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
@@ -314,6 +367,16 @@ export default function Dashboard() {
                   <Printer className="h-4 w-4" />
                   ბეჭდვა
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteRequest(req)}
+                    disabled={deletingRequestId === req.id}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+                  >
+                    {deletingRequestId === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    წაშლა
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -410,6 +473,20 @@ export default function Dashboard() {
                         >
                           <Printer className="w-5 h-5" />
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteRequest(req)}
+                            disabled={deletingRequestId === req.id}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
+                            title="წაშლა"
+                          >
+                            {deletingRequestId === req.id ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-5 h-5" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
