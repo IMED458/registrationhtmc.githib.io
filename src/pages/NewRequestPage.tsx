@@ -24,10 +24,7 @@ export default function NewRequestPage() {
   const canCreateRequests = isAdmin || isDoctorOrNurse;
   const icdLookupRequestRef = useRef(0);
   const requiresStructuredFields = patientLookupSource === 'sheet';
-  const requiresDiagnosisDescription =
-    requiresStructuredFields && formData.requestedAction !== 'კვლევა';
   const automaticSenderName = profile?.fullName?.trim() || profile?.email?.split('@')[0] || 'ემერჯენსი';
-  const resolvedSenderName = formData.senderName.trim() || automaticSenderName;
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
@@ -53,6 +50,10 @@ export default function NewRequestPage() {
     doctorComment: '',
     senderName: '',
   });
+
+  const requiresDiagnosisDescription =
+    requiresStructuredFields && formData.requestedAction !== 'კვლევა';
+  const resolvedSenderName = formData.senderName.trim() || automaticSenderName;
 
   const filteredDepts = DEPARTMENTS.filter(d => 
     d.toLowerCase().includes(deptSearch.toLowerCase())
