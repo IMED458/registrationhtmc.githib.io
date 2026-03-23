@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist docs",
     "lint": "eslint .",
-    "sync:icd10": "node scripts/syncIcd10Data.mjs"
+    "sync:icd10": "node scripts/syncIcd10Data.mjs",
+    "deploy:functions": "firebase deploy --only functions --project registration-ee52c"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -42,6 +43,7 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^10.1.0",
+    "firebase-tools": "^15.11.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.21.0",

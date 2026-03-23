@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { AlertTriangle, FileCog, Loader2, Search } from 'lucide-react';
 import { missingFirebaseEnvKeys } from '../firebase';
+import { resolveServerApiUrl } from '../serverApi';
 
 export default function FirebaseSetupPage() {
   const [historyNumber, setHistoryNumber] = useState('');
@@ -24,7 +25,13 @@ export default function FirebaseSetupPage() {
     setLookupResult(null);
 
     try {
-      const response = await fetch('/api/external/lookup', {
+      const lookupApiUrl = resolveServerApiUrl('/api/external/lookup');
+
+      if (!lookupApiUrl) {
+        throw new Error('გარე API მისამართი ჯერ არ არის გამართული.');
+      }
+
+      const response = await fetch(lookupApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

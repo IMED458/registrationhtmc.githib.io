@@ -4,11 +4,11 @@
 
 ## ფუნქციები
 
-- `Google Sign-In only` ავტორიზაცია
+- `Google` ან `ელ-ფოსტა/პაროლით` ავტორიზაცია
 - მკაცრი დაშვება მხოლოდ 3 წინასწარ განსაზღვრულ მომხმარებელზე
 - მოთხოვნის შექმნა, დათვალიერება, სტატუსის განახლება და ბეჭდვა
 - Audit log და ადმინისტრატორის პარამეტრები
-- Google Sheets-დან პაციენტის ძებნის სერვერული endpoint
+- Google Sheets-დან პაციენტის ძებნის და H/I სვეტების ჩაწერის backend endpoint
 
 ## დაშვებული მომხმარებლები
 
@@ -29,4 +29,11 @@
 - Firestore indexes: `firestore.indexes.json`
 - Firebase config: `firebase.json`
 
-თუ პაციენტის ძებნა უნდა კითხულობდეს დაცულ Google Sheet-ს, დაამატეთ `GOOGLE_SERVICE_ACCOUNT_JSON` გარემოს ცვლადი.
+## Google Sheets backend
+
+- Firebase Functions კოდი დევს `functions/` საქაღალდეში
+- ლოკალურად API მუშაობს `npm run dev`-ით (`server.ts`)
+- live GitHub Pages-დან backend-ზე გასასვლელად build environment-ში უნდა შეივსოს `VITE_SERVER_API_BASE_URL`
+- Firebase Functions deploy: `npm run deploy:functions`
+
+თუ პაციენტის ძებნა უნდა კითხულობდეს დაცულ Google Sheet-ს, backend გარემოში დაამატეთ `GOOGLE_SERVICE_ACCOUNT_JSON` ან გაუზიარეთ Sheet შესაბამის Google service account-ს.

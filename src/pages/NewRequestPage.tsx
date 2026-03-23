@@ -193,7 +193,14 @@ export default function NewRequestPage() {
         return;
       }
 
-      const response = await fetch('/api/external/lookup', {
+      const lookupApiUrl = resolveServerApiUrl('/api/external/lookup');
+
+      if (!lookupApiUrl) {
+        setLookupMessage('პაციენტი ვერ მოიძებნა ან გარე წყარო ჯერ არ არის გამართული.');
+        return;
+      }
+
+      const response = await fetch(lookupApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
