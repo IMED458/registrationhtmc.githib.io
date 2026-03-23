@@ -60,29 +60,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setAuthError('');
 
-        const docRef = doc(db, 'users', firebaseUser.uid);
-        const docSnap = await getDoc(docRef);
-        const existingProfile = docSnap.exists() ? (docSnap.data() as Partial<UserProfile>) : null;
-        const mergedProfile: UserProfile = {
+        let existingProfile: Partial<UserProfile> | null = null;
+        const fallbackProfile: UserProfile = {
           uid: firebaseUser.uid,
           fullName:
             firebaseUser.displayName ||
-            existingProfile?.fullName ||
             allowedUser.email.split('@')[0] ||
             'Clinic User',
           email: allowedUser.email,
           role: allowedUser.role,
-          createdAt: existingProfile?.createdAt || new Date().toISOString(),
+          createdAt: new Date().toISOString(),
         };
 
-        await setDoc(docRef, mergedProfile, { merge: true });
+        try {
+          const docRef = doc(db, 'users', firebaseUser.uid);
+          const docSnap = await getDoc(docRef);
+          existingProfile = docSnap.exists() ? (docSnap.data() as Partial<UserProfile>) : null;
+
+          const mergedProfile: UserProfile = {
+            ...fallbackProfile,
+            fullName:
+              firebaseUser.displayName ||
+              existingProfile?.fullName ||
+              fallbackProfile.fullName,
+            createdAt: existingProfile?.createdAt || fallbackProfile.createdAt,
+          };
+
+          await setDoc(docRef, mergedProfile, { merge: true });
+
+          if (!isMounted) {
+            return;
+          }
+
+          setUser(firebaseUser);
+          setProfile(mergedProfile);
+          return;
+        } catch (profileSyncError) {
+          console.error('User profile sync failed, continuing with fallback profile:', profileSyncError);
+        }
 
         if (!isMounted) {
           return;
         }
 
         setUser(firebaseUser);
-        setProfile(mergedProfile);
+        setProfile({
+          ...fallbackProfile,
+          fullName:
+            firebaseUser.displayName ||
+            existingProfile?.fullName ||
+            fallbackProfile.fullName,
+          createdAt: existingProfile?.createdAt || fallbackProfile.createdAt,
+        });
       } catch (error) {
         console.error('Auth initialization failed:', error);
 
