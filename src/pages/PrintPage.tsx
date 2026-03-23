@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
+import { getDiagnosisDisplayParts } from '../icd10Utils';
 import { ClinicalRequest } from '../types';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
@@ -96,9 +97,22 @@ export default function PrintPage() {
             <div className="space-y-4">
               <div>
                 <div className="text-[10px] font-black uppercase text-slate-500">დიაგნოზი (ICD-10)</div>
-                <div className="text-lg font-bold border-b border-slate-300 pb-1">
-                  {request.icdCode || request.diagnosis || '-'}
-                </div>
+                {(() => {
+                  const diagnosisParts = getDiagnosisDisplayParts(request);
+
+                  return (
+                    <div className="space-y-1 border-b border-slate-300 pb-1">
+                      <div className="text-lg font-bold">
+                        {diagnosisParts.code || diagnosisParts.combined}
+                      </div>
+                      {diagnosisParts.description && (
+                        <div className="text-sm font-medium leading-5 text-slate-700">
+                          {diagnosisParts.description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <div className="text-[10px] font-black uppercase text-slate-500">მოთხოვნილი კვლევა / მოქმედება</div>

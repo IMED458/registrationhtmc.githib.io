@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
+import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } from '../icd10Lookup';
+import { normalizeIcdCode } from '../icd10Utils';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { resolveServerApiUrl } from '../serverApi';
 import { ClinicalRequest } from '../types';
@@ -19,9 +21,14 @@ export default function NewRequestPage() {
   const [error, setError] = useState('');
   const [lookupMessage, setLookupMessage] = useState('');
   const canCreateRequests = isAdmin || isDoctorOrNurse;
+  const icdLookupRequestRef = useRef(0);
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
+  const [icdSuggestions, setIcdSuggestions] = useState<IcdEntry[]>([]);
+  const [activeIcdField, setActiveIcdField] = useState<'code' | 'diagnosis' | null>(null);
+  const [icdLoading, setIcdLoading] = useState(false);
+  const [icdMessage, setIcdMessage] = useState('');
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -32,6 +39,7 @@ export default function NewRequestPage() {
     phone: '',
     address: '',
     icdCode: '',
+    diagnosis: '',
     requestedAction: REQUEST_ACTIONS[0],
     department: '',
     studyType: '',
@@ -42,6 +50,120 @@ export default function NewRequestPage() {
   const filteredDepts = DEPARTMENTS.filter(d => 
     d.toLowerCase().includes(deptSearch.toLowerCase())
   );
+
+  useEffect(() => {
+    void preloadIcdEntries();
+  }, []);
+
+  const runIcdSearch = async (query: string, field: 'code' | 'diagnosis') => {
+    const requestId = icdLookupRequestRef.current + 1;
+    icdLookupRequestRef.current = requestId;
+
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setIcdSuggestions([]);
+      setActiveIcdField(null);
+      setIcdMessage('');
+
+      if (field === 'code') {
+        setFormData((prev) => ({
+          ...prev,
+          diagnosis: '',
+        }));
+      }
+
+      return;
+    }
+
+    setIcdLoading(true);
+
+    try {
+      const [exactCodeEntry, suggestions] = await Promise.all([
+        field === 'code' ? findIcdEntryByCode(trimmedQuery) : Promise.resolve(null),
+        searchIcdEntries(trimmedQuery),
+      ]);
+
+      if (icdLookupRequestRef.current !== requestId) {
+        return;
+      }
+
+      if (field === 'code') {
+        const normalizedCode = normalizeIcdCode(trimmedQuery);
+
+        setFormData((prev) =>
+          prev.icdCode === normalizedCode
+            ? {
+                ...prev,
+                diagnosis: exactCodeEntry?.name || '',
+              }
+            : prev,
+        );
+
+        setIcdMessage(
+          exactCodeEntry
+            ? 'დიაგნოზი ავტომატურად შეივსო ICD-10 ჩამონათვალიდან.'
+            : '',
+        );
+      } else {
+        setIcdMessage('');
+      }
+
+      setIcdSuggestions(suggestions);
+      setActiveIcdField(suggestions.length ? field : null);
+    } catch (lookupError) {
+      console.error('ICD lookup error:', lookupError);
+
+      if (icdLookupRequestRef.current === requestId) {
+        setIcdSuggestions([]);
+        setActiveIcdField(null);
+        setIcdMessage('ICD-10 ჩამონათვალის ჩატვირთვა ვერ მოხერხდა.');
+      }
+    } finally {
+      if (icdLookupRequestRef.current === requestId) {
+        setIcdLoading(false);
+      }
+    }
+  };
+
+  const handleIcdCodeChange = (nextValue: string) => {
+    const normalizedCode = normalizeIcdCode(nextValue);
+
+    setFormData((prev) => ({
+      ...prev,
+      icdCode: normalizedCode,
+      diagnosis: normalizedCode === prev.icdCode ? prev.diagnosis : '',
+    }));
+
+    void runIcdSearch(normalizedCode, 'code');
+  };
+
+  const handleDiagnosisChange = (nextValue: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      diagnosis: nextValue,
+    }));
+
+    void runIcdSearch(nextValue, 'diagnosis');
+  };
+
+  const handleIcdSuggestionPick = (entry: IcdEntry) => {
+    icdLookupRequestRef.current += 1;
+    setFormData((prev) => ({
+      ...prev,
+      icdCode: entry.code,
+      diagnosis: entry.name,
+    }));
+    setIcdSuggestions([]);
+    setActiveIcdField(null);
+    setIcdMessage('დიაგნოზი ავტომატურად შეივსო ICD-10 ჩამონათვალიდან.');
+  };
+
+  const scheduleIcdDropdownClose = () => {
+    window.setTimeout(() => {
+      setActiveIcdField(null);
+    }, 140);
+  };
 
   const handleLookup = async () => {
     if (!formData.historyNumber && !formData.personalId) return;
@@ -116,6 +238,11 @@ export default function NewRequestPage() {
       setError('კვლევის მოთხოვნისთვის მიუთითეთ კვლევის ტიპი.');
       return;
     }
+
+    if (!formData.diagnosis.trim()) {
+      setError('ICD-10 კოდის მიხედვით შეავსეთ დიაგნოზის განმარტება.');
+      return;
+    }
     
     setLoading(true);
     setError('');
@@ -144,7 +271,7 @@ export default function NewRequestPage() {
         department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
         studyType: formData.studyType,
         consentStatus: formData.consentStatus,
-        diagnosis: formData.icdCode, // Use ICD code as diagnosis
+        diagnosis: formData.diagnosis.trim(),
         icdCode: formData.icdCode,
         doctorComment: formData.doctorComment,
         currentStatus: 'ახალი',
@@ -365,18 +492,84 @@ export default function NewRequestPage() {
           
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">ICD-10 კოდი (დიაგნოზი)</label>
+              <div className="space-y-2 relative">
+                <label className="text-sm font-bold text-slate-700">ICD-10 კოდი</label>
                 <input
                   type="text"
                   required
-                  placeholder="მაგ: I10"
+                  placeholder="მაგ: R10.4"
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.icdCode}
-                  onChange={(e) => setFormData({ ...formData, icdCode: e.target.value })}
+                  onChange={(e) => handleIcdCodeChange(e.target.value)}
+                  onFocus={() => {
+                    if (formData.icdCode.trim()) {
+                      void runIcdSearch(formData.icdCode, 'code');
+                    }
+                  }}
+                  onBlur={scheduleIcdDropdownClose}
                 />
+                {activeIcdField === 'code' && icdSuggestions.length > 0 && (
+                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                    {icdSuggestions.map((entry) => (
+                      <button
+                        key={entry.code}
+                        type="button"
+                        className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleIcdSuggestionPick(entry)}
+                      >
+                        <span className="min-w-[5rem] text-xs font-black text-emerald-700">{entry.code}</span>
+                        <span className="text-sm text-slate-700">{entry.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 relative">
+                <label className="text-sm font-bold text-slate-700">დიაგნოზის განმარტება</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="აირჩიეთ ICD-10 კოდი ან მოძებნეთ დიაგნოზით"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  value={formData.diagnosis}
+                  onChange={(e) => handleDiagnosisChange(e.target.value)}
+                  onFocus={() => {
+                    if (formData.diagnosis.trim()) {
+                      void runIcdSearch(formData.diagnosis, 'diagnosis');
+                    }
+                  }}
+                  onBlur={scheduleIcdDropdownClose}
+                />
+                {activeIcdField === 'diagnosis' && icdSuggestions.length > 0 && (
+                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                    {icdSuggestions.map((entry) => (
+                      <button
+                        key={`${entry.code}-diagnosis`}
+                        type="button"
+                        className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleIcdSuggestionPick(entry)}
+                      >
+                        <span className="min-w-[5rem] text-xs font-black text-emerald-700">{entry.code}</span>
+                        <span className="text-sm text-slate-700">{entry.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
+
+            {(icdLoading || icdMessage) && (
+              <div className={`rounded-xl border px-4 py-3 text-sm ${
+                icdMessage.includes('ვერ მოხერხდა')
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-slate-200 bg-slate-50 text-slate-600'
+              }`}>
+                {icdLoading ? 'ICD-10 ჩამონათვალი იტვირთება...' : icdMessage}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">

@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
+import { getDiagnosisDisplayParts } from '../icd10Utils';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
 import { CheckCircle2, Clock, Filter, Loader2, MoreHorizontal, Plus, Printer, Search, Trash2, XCircle } from 'lucide-react';
@@ -321,9 +322,22 @@ export default function Dashboard() {
               <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl bg-slate-50 p-3">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დიაგნოზი</div>
-                  <div className="mt-1 inline-flex rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-black text-slate-900">
-                    {req.icdCode || req.diagnosis || '-'}
-                  </div>
+                  {(() => {
+                    const diagnosisParts = getDiagnosisDisplayParts(req);
+
+                    return (
+                      <div className="mt-1 space-y-1">
+                        <div className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-black text-slate-900">
+                          {diagnosisParts.code || diagnosisParts.combined}
+                        </div>
+                        {diagnosisParts.description && (
+                          <div className="text-sm text-slate-600">
+                            {diagnosisParts.description}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">მოთხოვნა</div>
@@ -419,9 +433,22 @@ export default function Dashboard() {
                       <div className="font-bold text-slate-900">{req.patientData.firstName} {req.patientData.lastName}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-lg font-black text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200 inline-block">
-                        {req.icdCode || req.diagnosis || '-'}
-                      </div>
+                      {(() => {
+                        const diagnosisParts = getDiagnosisDisplayParts(req);
+
+                        return (
+                          <div className="space-y-1">
+                            <div className="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-lg font-black text-slate-900">
+                              {diagnosisParts.code || diagnosisParts.combined}
+                            </div>
+                            {diagnosisParts.description && (
+                              <div className="max-w-xs text-sm leading-5 text-slate-600 whitespace-normal">
+                                {diagnosisParts.description}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-slate-700">{req.patientData.historyNumber}</div>

@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
+import { getDiagnosisDisplayParts } from '../icd10Utils';
 import { ClinicalRequest } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User } from 'lucide-react';
@@ -245,7 +246,18 @@ export default function RequestDetailsPage() {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">დიაგნოზი (ICD-10)</div>
-                  <div className="font-bold text-slate-900 mt-1">{request.icdCode || request.diagnosis || '-'}</div>
+                  {(() => {
+                    const diagnosisParts = getDiagnosisDisplayParts(request);
+
+                    return (
+                      <div className="mt-1 space-y-1">
+                        <div className="font-bold text-slate-900">{diagnosisParts.code || diagnosisParts.combined}</div>
+                        {diagnosisParts.description && (
+                          <div className="text-sm leading-6 text-slate-600">{diagnosisParts.description}</div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               <div>
