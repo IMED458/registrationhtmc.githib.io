@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import net from "net";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -22,9 +23,34 @@ function getGoogleAuthClient() {
   });
 }
 
+async function isPortFree(port: number) {
+  return await new Promise<boolean>((resolve) => {
+    const tester = net.createServer();
+
+    tester.once("error", () => resolve(false));
+    tester.once("listening", () => {
+      tester.close(() => resolve(true));
+    });
+
+    tester.listen(port, "0.0.0.0");
+  });
+}
+
+async function resolvePort() {
+  const preferredPort = Number(process.env.PORT || 3000);
+
+  for (let port = preferredPort; port < preferredPort + 20; port += 1) {
+    if (await isPortFree(port)) {
+      return port;
+    }
+  }
+
+  throw new Error(`No free port found between ${preferredPort} and ${preferredPort + 19}`);
+}
+
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT || 3000);
+  const PORT = await resolvePort();
 
   app.use(cors());
   app.use(express.json());

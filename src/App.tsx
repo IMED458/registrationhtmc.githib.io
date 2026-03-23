@@ -7,6 +7,8 @@ import NewRequestPage from './pages/NewRequestPage';
 import RequestDetailsPage from './pages/RequestDetailsPage';
 import PrintPage from './pages/PrintPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
+import FirebaseSetupPage from './pages/FirebaseSetupPage';
+import { isFirebaseConfigured } from './firebase';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -32,6 +34,10 @@ function LoginRoute() {
 }
 
 export default function App() {
+  if (!isFirebaseConfigured) {
+    return <FirebaseSetupPage />;
+  }
+
   return (
     <AuthProvider>
       <BrowserRouter>

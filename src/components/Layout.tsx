@@ -9,6 +9,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
+    if (!auth) {
+      navigate('/login');
+      return;
+    }
+
     await auth.signOut();
     navigate('/login');
   };
