@@ -1,25 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  updateProfile,
 } from 'firebase/auth';
-import { ACCESS_DENIED_MESSAGE, ALLOWED_EMAILS, getAllowedUserConfig, normalizeEmail } from '../accessControl';
+import { ACCESS_DENIED_MESSAGE, getAllowedUserConfig, normalizeEmail } from '../accessControl';
 import { useAuth } from '../AuthContext';
 import { auth } from '../firebase';
-import { AlertCircle, Chrome, ClipboardList, Mail, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Chrome, ClipboardList, Mail } from 'lucide-react';
 
 export default function LoginPage() {
   const { authError, clearAuthError, loading: authLoading, profile, user } = useAuth();
   const [error, setError] = useState('');
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -95,28 +91,16 @@ export default function LoginPage() {
     setError('');
 
     try {
-      if (mode === 'register') {
-        const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-
-        if (fullName.trim()) {
-          await updateProfile(credential.user, { displayName: fullName.trim() });
-        }
-      } else {
-        await signInWithEmailAndPassword(auth, normalizedEmail, password);
-      }
+      await signInWithEmailAndPassword(auth, normalizedEmail, password);
     } catch (err: any) {
-      if (err?.code === 'auth/email-already-in-use') {
-        setError('ეს ელ-ფოსტა უკვე დარეგისტრირებულია. გამოიყენე შესვლა.');
-      } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
+      if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
         setError('ელ-ფოსტა ან პაროლი არასწორია.');
       } else if (err?.code === 'auth/user-not-found') {
         setError('ასეთი ანგარიში ვერ მოიძებნა.');
       } else if (err?.code === 'auth/operation-not-allowed') {
         setError('Firebase Console-ში ჩართე Email/Password sign-in provider.');
-      } else if (err?.code === 'auth/weak-password') {
-        setError('პაროლი სუსტია. სცადე უფრო ძლიერი პაროლი.');
       } else {
-        setError(mode === 'register' ? 'რეგისტრაცია ვერ მოხერხდა.' : 'შესვლა ვერ მოხერხდა.');
+        setError('შესვლა ვერ მოხერხდა.');
       }
 
       console.error(err);
@@ -134,7 +118,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">კლინიკის სისტემა</h1>
           <p className="text-slate-500 mt-2">
-            სისტემაში შესვლა შესაძლებელია Google-ითაც და ელ-ფოსტითაც
+            სისტემაში შესვლა შეუძლიათ მხოლოდ წინასწარ განსაზღვრულ თანამშრომლებს
           </p>
         </div>
 
@@ -146,33 +130,6 @@ export default function LoginPage() {
         )}
 
         <div className="space-y-4">
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-slate-700">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <span className="font-semibold">დაშვებული ანგარიშები</span>
-            </div>
-            <p className="text-sm text-slate-500">
-              სისტემაში შედიან მხოლოდ წინასწარ დაშვებული თანამშრომლები. ხელით რეგისტრაციაც იმუშავებს მხოლოდ ამ მეილებზე.
-            </p>
-            <div className="space-y-2">
-              {ALLOWED_EMAILS.map((email) => {
-                const allowedUser = getAllowedUserConfig(email);
-
-                return (
-                  <div
-                    key={email}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium text-slate-700">{email}</span>
-                    <span className="text-xs font-bold uppercase text-emerald-700">
-                      {allowedUser?.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           <button
             onClick={handleGoogleLogin}
             disabled={loading || authLoading}
@@ -193,41 +150,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="flex rounded-2xl bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => setMode('login')}
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              შესვლა
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('register')}
-              className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === 'register' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              რეგისტრაცია
-            </button>
-          </div>
-
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-            {mode === 'register' && (
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">სახელი და გვარი</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
-                  placeholder="მაგ: გიორგი იმედაშვილი"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            )}
-
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-slate-700">ელ-ფოსტა</label>
               <div className="relative">
@@ -253,17 +176,17 @@ export default function LoginPage() {
               />
             </div>
 
+            <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              რეგისტრაცია გამორთულია. თუ პაროლი არ გაქვს ან ვერ შედიხარ, მიმართე ადმინისტრატორს.
+            </p>
+
             <button
               type="button"
               onClick={handleEmailAuth}
               disabled={loading || authLoading}
               className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading || authLoading
-                ? 'მიმდინარეობს...'
-                : mode === 'register'
-                  ? 'რეგისტრაცია ელ-ფოსტით'
-                  : 'შესვლა ელ-ფოსტით'}
+              {loading || authLoading ? 'მიმდინარეობს...' : 'შესვლა ელ-ფოსტით'}
             </button>
           </div>
         </div>
