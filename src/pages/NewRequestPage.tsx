@@ -10,8 +10,9 @@ import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } fro
 import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { resolveServerApiUrl } from '../serverApi';
+import { sanitizeStudyTypes } from '../studyTypeUtils';
 import { ClinicalRequest, DiagnosisEntry } from '../types';
-import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS } from '../constants';
+import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS, STUDY_TYPE_OPTIONS } from '../constants';
 import { ArrowLeft, FileText, Loader2, Plus, Save, Search, Trash2, User } from 'lucide-react';
 
 type DiagnosisFormRow = DiagnosisEntry & {
@@ -77,6 +78,8 @@ export default function NewRequestPage() {
   const [activeIcdField, setActiveIcdField] = useState<ActiveIcdField>(null);
   const [icdLoading, setIcdLoading] = useState(false);
   const [icdMessage, setIcdMessage] = useState('');
+  const [studyTypeInput, setStudyTypeInput] = useState('');
+  const [selectedStudyOption, setSelectedStudyOption] = useState('');
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -89,7 +92,7 @@ export default function NewRequestPage() {
     diagnoses: [createDiagnosisRow({ isPrimary: true })],
     requestedAction: REQUEST_ACTIONS[0],
     department: '',
-    studyType: '',
+    studyTypes: [] as string[],
     consentStatus: '',
     doctorComment: '',
     senderName: '',
@@ -104,6 +107,26 @@ export default function NewRequestPage() {
   const filteredDepts = DEPARTMENTS.filter(d => 
     d.toLowerCase().includes(deptSearch.toLowerCase())
   );
+
+  const addStudyType = (value: string) => {
+    const normalizedValue = sanitizeStudyTypes([value])[0];
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      studyTypes: sanitizeStudyTypes([...prev.studyTypes, normalizedValue]),
+    }));
+  };
+
+  const removeStudyType = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      studyTypes: prev.studyTypes.filter((studyType) => studyType !== value),
+    }));
+  };
 
   useEffect(() => {
     void preloadIcdEntries();
@@ -398,12 +421,13 @@ export default function NewRequestPage() {
       return;
     }
 
-    if (requiresStructuredFields && formData.requestedAction === 'კვლევა' && !formData.studyType.trim()) {
-      setError('კვლევის მოთხოვნისთვის მიუთითეთ კვლევის ტიპი.');
+    const diagnoses = sanitizeDiagnoses(formData.diagnoses);
+    const studyTypes = sanitizeStudyTypes([...formData.studyTypes, studyTypeInput]);
+
+    if (requiresStructuredFields && formData.requestedAction === 'კვლევა' && studyTypes.length === 0) {
+      setError('კვლევის მოთხოვნისთვის მიუთითეთ მინიმუმ ერთი კვლევის ტიპი.');
       return;
     }
-
-    const diagnoses = sanitizeDiagnoses(formData.diagnoses);
 
     if (requiresDiagnosisDescription) {
       if (diagnoses.length === 0) {
@@ -450,7 +474,8 @@ export default function NewRequestPage() {
         formFillerName: resolvedSenderName,
         requestedAction: formData.requestedAction,
         department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
-        studyType: formData.studyType,
+        studyType: studyTypes.join(', '),
+        studyTypes,
         consentStatus: formData.consentStatus,
         diagnosis: representativeDiagnosis?.diagnosis || '',
         icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
@@ -877,15 +902,91 @@ export default function NewRequestPage() {
               )}
 
               {formData.requestedAction === 'კვლევა' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">კვლევის ტიპი</label>
-                  <input
-                    type="text"
-                    placeholder="მაგ: მუცლის ღრუს CT"
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                    value={formData.studyType}
-                    onChange={(e) => setFormData({ ...formData, studyType: e.target.value })}
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700">კვლევის ტიპები</label>
+                    <p className="text-xs text-slate-500">
+                      შეგიძლიათ აირჩიოთ კატეგორიიდან, ხელით ჩაწეროთ და რამდენიმე კვლევა ერთად დაამატოთ.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <select
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={selectedStudyOption}
+                      onChange={(e) => setSelectedStudyOption(e.target.value)}
+                    >
+                      <option value="">აირჩიეთ კვლევის კატეგორიიდან...</option>
+                      {STUDY_TYPE_OPTIONS.map((studyTypeOption) => (
+                        <option key={studyTypeOption} value={studyTypeOption}>
+                          {studyTypeOption}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addStudyType(selectedStudyOption);
+                        setSelectedStudyOption('');
+                      }}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700 transition hover:bg-slate-200"
+                    >
+                      <Plus className="h-4 w-4" />
+                      დამატება
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <input
+                      type="text"
+                      placeholder="ხელით ჩაწერეთ კვლევა..."
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={studyTypeInput}
+                      onChange={(e) => setStudyTypeInput(e.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          addStudyType(studyTypeInput);
+                          setStudyTypeInput('');
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addStudyType(studyTypeInput);
+                        setStudyTypeInput('');
+                      }}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      ხელით დამატება
+                    </button>
+                  </div>
+
+                  {formData.studyTypes.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.studyTypes.map((studyType) => (
+                        <span
+                          key={studyType}
+                          className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700"
+                        >
+                          {studyType}
+                          <button
+                            type="button"
+                            onClick={() => removeStudyType(studyType)}
+                            className="text-emerald-700 transition hover:text-emerald-900"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-400">
+                      კვლევა ჯერ დამატებული არ არის.
+                    </div>
+                  )}
                 </div>
               )}
             </div>

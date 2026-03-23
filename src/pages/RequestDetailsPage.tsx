@@ -7,6 +7,7 @@ import { resolveUserDisplayName } from '../accessControl';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
+import { getStudyTypes } from '../studyTypeUtils';
 import { ClinicalRequest, DiagnosisEntry, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Plus, Printer, Save, Trash2, User } from 'lucide-react';
@@ -751,8 +752,21 @@ export default function RequestDetailsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 uppercase font-bold">კვლევის ტიპი</div>
-                  <div className="font-bold text-emerald-600">{request.studyType || '-'}</div>
+                  <div className="text-xs text-slate-400 uppercase font-bold">კვლევის ტიპები</div>
+                  {getStudyTypes(request).length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {getStudyTypes(request).map((studyType) => (
+                        <span
+                          key={studyType}
+                          className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700"
+                        >
+                          {studyType}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="font-bold text-emerald-600">-</div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

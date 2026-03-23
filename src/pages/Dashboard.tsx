@@ -7,6 +7,7 @@ import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { getDiagnosisEntries, getDiagnosisSearchText, normalizeIcdCode } from '../icd10Utils';
+import { getStudyTypeSummary } from '../studyTypeUtils';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
 import { CheckCircle2, Clock, Filter, Loader2, MoreHorizontal, Plus, Printer, Search, Trash2, XCircle } from 'lucide-react';
@@ -211,6 +212,7 @@ export default function Dashboard() {
 
   const filteredRequests = requests.filter(req => {
     const diagnosisSearchText = getDiagnosisSearchText(req).toLowerCase();
+    const studyTypeSearchText = getStudyTypeSummary(req).toLowerCase();
     const normalizedIcdSearch = normalizeIcdCode(searchTerm);
     const normalizedRequestCode = normalizeIcdCode(diagnosisSearchText);
     const matchesSearch = 
@@ -219,6 +221,7 @@ export default function Dashboard() {
       req.patientData.historyNumber.includes(searchTerm) ||
       req.patientData.personalId.includes(searchTerm) ||
       diagnosisSearchText.includes(searchTerm.toLowerCase()) ||
+      studyTypeSearchText.includes(searchTerm.toLowerCase()) ||
       (normalizedIcdSearch ? normalizedRequestCode.includes(normalizedIcdSearch) : false) ||
       getRequestActionLabel(req).toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -439,8 +442,8 @@ export default function Dashboard() {
                   <div className={`mt-1 text-sm font-bold ${getRequestActionTextClass(req)}`}>
                     {getRequestActionLabel(req)}
                   </div>
-                  {req.studyType && (
-                    <div className="mt-1 text-xs font-bold text-emerald-600">{req.studyType}</div>
+                  {getStudyTypeSummary(req) && (
+                    <div className="mt-1 text-xs font-bold text-emerald-600">{getStudyTypeSummary(req)}</div>
                   )}
                 </div>
                 <div>
@@ -561,7 +564,7 @@ export default function Dashboard() {
                       <div className={`text-sm font-medium ${getRequestActionTextClass(req)}`}>
                         {getRequestActionLabel(req)}
                       </div>
-                      {req.studyType && <div className="text-xs text-emerald-600 font-bold">{req.studyType}</div>}
+                      {getStudyTypeSummary(req) && <div className="text-xs text-emerald-600 font-bold">{getStudyTypeSummary(req)}</div>}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-slate-600">{getRequestSenderLabel(req)}</div>

@@ -55,6 +55,7 @@ export interface ClinicalRequest {
   createdByUserEmail?: string;
   requestedAction: string;
   studyType?: string;
+  studyTypes?: string[];
   department?: string;
   consentStatus: string;
   diagnosis: string;

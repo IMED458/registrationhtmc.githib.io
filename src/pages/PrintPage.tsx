@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { resolveUserDisplayName } from '../accessControl';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { getDiagnosisEntries } from '../icd10Utils';
+import { getStudyTypes } from '../studyTypeUtils';
 import { ClinicalRequest } from '../types';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
@@ -136,8 +137,22 @@ export default function PrintPage() {
               </div>
               <div>
                 <div className="text-[10px] font-black uppercase text-slate-500">მოთხოვნილი კვლევა / მოქმედება</div>
-                <div className="text-lg font-bold border-b border-slate-300 pb-1">
-                  {request.requestedAction} {request.department ? `(${request.department})` : ''} {request.studyType ? `(${request.studyType})` : ''}
+                <div className="space-y-2 border-b border-slate-300 pb-1">
+                  <div className="text-lg font-bold">
+                    {request.requestedAction} {request.department ? `(${request.department})` : ''}
+                  </div>
+                  {getStudyTypes(request).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {getStudyTypes(request).map((studyType) => (
+                        <span
+                          key={studyType}
+                          className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700"
+                        >
+                          {studyType}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
