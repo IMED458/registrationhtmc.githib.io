@@ -234,6 +234,7 @@ export default function RequestDetailsPage() {
   const canDoctorEdit = isDoctorOrNurse && isRequestOwner && !isAdmin && !isRegistrar;
   const canOpenFullEdit = canDoctorEdit || isAdmin;
   const showManagementPanel = isRegistrarOnly || isAdmin;
+  const isDoctorInlineEditing = canDoctorEdit && isEditing;
   const requiresRegistrarComment = isRegistrarOnly && Boolean(request?.lastRegistrarEditAt);
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
@@ -432,8 +433,7 @@ export default function RequestDetailsPage() {
     });
   };
 
-  const handleUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
+  const prepareUpdate = () => {
     if (!id || !profile || !request) {
       return;
     }
@@ -464,6 +464,11 @@ export default function RequestDetailsPage() {
 
     setFormError('');
     setConfirmAction('save');
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    prepareUpdate();
   };
 
   const handleStartEditing = () => {
@@ -846,23 +851,89 @@ export default function RequestDetailsPage() {
             <div className="grid grid-cols-1 gap-x-6 gap-y-4 p-4 sm:p-6 md:grid-cols-2">
               <div>
                 <div className="text-xs text-slate-400 uppercase font-bold">სახელი, გვარი</div>
-                <div className="font-bold text-slate-900">{request.patientData.firstName} {request.patientData.lastName}</div>
+                {isDoctorInlineEditing ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    />
+                  </div>
+                ) : (
+                  <div className="font-bold text-slate-900">{request.patientData.firstName} {request.patientData.lastName}</div>
+                )}
               </div>
               <div>
                 <div className="text-xs text-slate-400 uppercase font-bold">ისტორიის ნომერი</div>
-                <div className="font-bold text-slate-900">{request.patientData.historyNumber}</div>
+                {isDoctorInlineEditing ? (
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.historyNumber}
+                    onChange={(e) => setFormData({ ...formData, historyNumber: e.target.value })}
+                  />
+                ) : (
+                  <div className="font-bold text-slate-900">{request.patientData.historyNumber}</div>
+                )}
               </div>
               <div>
                 <div className="text-xs text-slate-400 uppercase font-bold">პირადი ნომერი</div>
-                <div className="text-slate-700">{request.patientData.personalId}</div>
+                {isDoctorInlineEditing ? (
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.personalId}
+                    onChange={(e) => setFormData({ ...formData, personalId: e.target.value })}
+                  />
+                ) : (
+                  <div className="text-slate-700">{request.patientData.personalId}</div>
+                )}
               </div>
               <div>
                 <div className="text-xs text-slate-400 uppercase font-bold">დაბადების თარიღი</div>
-                <div className="text-slate-700">{request.patientData.birthDate || '-'}</div>
+                {isDoctorInlineEditing ? (
+                  <input
+                    type="date"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.birthDate}
+                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  />
+                ) : (
+                  <div className="text-slate-700">{request.patientData.birthDate || '-'}</div>
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 uppercase font-bold">ტელეფონი</div>
+                {isDoctorInlineEditing ? (
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                ) : (
+                  <div className="text-slate-700">{request.patientData.phone || '-'}</div>
+                )}
               </div>
               <div className="md:col-span-2">
                 <div className="text-xs text-slate-400 uppercase font-bold">მისამართი</div>
-                <div className="text-slate-700">{request.patientData.address || '-'}</div>
+                {isDoctorInlineEditing ? (
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  />
+                ) : (
+                  <div className="text-slate-700">{request.patientData.address || '-'}</div>
+                )}
               </div>
             </div>
           </div>
@@ -873,6 +944,18 @@ export default function RequestDetailsPage() {
               <h3 className="font-bold text-slate-700">მოთხოვნის დეტალები</h3>
             </div>
             <div className="space-y-4 p-4 sm:p-6">
+              {isDoctorInlineEditing && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+                  ექიმის/ექთნის ცვლილება მაშინვე შეინახება, მაგრამ რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. კომენტარი სავალდებულოა.
+                </div>
+              )}
+
+              {isDoctorInlineEditing && formError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">მოთხოვნილი მოქმედება</div>
@@ -902,7 +985,80 @@ export default function RequestDetailsPage() {
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">დიაგნოზები (ICD-10)</div>
                   <div className="mt-1 space-y-3">
-                    {getDiagnosisEntries(request).length > 0 ? getDiagnosisEntries(request).map((diagnosisEntry, index) => (
+                    {isDoctorInlineEditing ? (
+                      <>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs leading-5 text-slate-500">
+                            დიაგნოზების დამატება, შეცვლა და წაშლა აქვე შეგიძლიათ.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={addDiagnosisRow}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700"
+                          >
+                            <Plus className="h-4 w-4" />
+                            დიაგნოზის დამატება
+                          </button>
+                        </div>
+
+                        {formData.diagnoses.map((diagnosisRow, index) => {
+                          const isSingleDiagnosis = formData.diagnoses.length === 1;
+
+                          return (
+                            <div key={diagnosisRow.id} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="text-sm font-bold text-slate-700">დიაგნოზი #{index + 1}</div>
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <label className={`inline-flex items-center gap-2 text-sm font-bold ${isSingleDiagnosis ? 'text-sky-700' : 'text-slate-600'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isSingleDiagnosis ? true : Boolean(diagnosisRow.isPrimary)}
+                                      disabled={isSingleDiagnosis}
+                                      onChange={() => togglePrimaryDiagnosis(diagnosisRow.id)}
+                                      className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                    />
+                                    {isSingleDiagnosis ? 'წამყვანი (ავტომატურად)' : 'წამყვანი'}
+                                  </label>
+                                  {formData.diagnoses.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeDiagnosisRow(diagnosisRow.id)}
+                                      className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      წაშლა
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <input
+                                  type="text"
+                                  placeholder="ICD-10 კოდი"
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                                  value={diagnosisRow.icdCode}
+                                  onChange={(e) => updateDiagnosisRow(diagnosisRow.id, { icdCode: e.target.value })}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="დიაგნოზის განმარტება"
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                                  value={diagnosisRow.diagnosis}
+                                  onChange={(e) => updateDiagnosisRow(diagnosisRow.id, { diagnosis: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {formData.diagnoses.length > 1 && !formData.diagnoses.some((row) => row.isPrimary) && (
+                          <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                            თუ არცერთ დიაგნოზს არ მონიშნავთ, სისტემა ყველა დიაგნოზს წამყვანად ჩათვლის.
+                          </div>
+                        )}
+                      </>
+                    ) : getDiagnosisEntries(request).length > 0 ? getDiagnosisEntries(request).map((diagnosisEntry, index) => (
                       <div key={`${diagnosisEntry.code || diagnosisEntry.description || 'diagnosis'}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="font-bold text-slate-900">
@@ -930,10 +1086,45 @@ export default function RequestDetailsPage() {
                   {request.consentStatus || '-'}
                 </div>
               </div>
-              {request.doctorComment && (
+              {request.doctorComment && !isDoctorInlineEditing && (
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">ექიმის კომენტარი</div>
                   <div className="text-slate-600 italic mt-1">"{request.doctorComment}"</div>
+                </div>
+              )}
+
+              {isDoctorInlineEditing && (
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    ცვლილების კომენტარი
+                    <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none resize-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.doctorEditComment}
+                    onChange={(e) => setFormData({ ...formData, doctorEditComment: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {isDoctorInlineEditing && (
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={handleCancelEditing}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                  >
+                    გაუქმება
+                  </button>
+                  <button
+                    type="button"
+                    onClick={prepareUpdate}
+                    disabled={updating || !formData.doctorEditComment.trim()}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
+                  >
+                    {updating ? 'ინახება...' : 'შენახვა'}
+                  </button>
                 </div>
               )}
             </div>
@@ -994,7 +1185,7 @@ export default function RequestDetailsPage() {
             </div>
           )}
 
-          {canOpenFullEdit && isEditing && (
+          {isAdmin && isEditing && (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1002,16 +1193,10 @@ export default function RequestDetailsPage() {
                   <h3 className="font-bold text-slate-700">რედაქტირება</h3>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  {canDoctorEdit ? 'პაციენტი და დიაგნოზი' : 'სრული წვდომა'}
+                  სრული წვდომა
                 </span>
               </div>
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
-                {canDoctorEdit && (
-                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
-                    ექიმის/ექთნის ცვლილება მაშინვე შეინახება, მაგრამ რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. კომენტარი სავალდებულოა.
-                  </div>
-                )}
-
                 {isAdmin && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
                     ადმინისტრატორს შეუძლია ამ რეჟიმიდან შეცვალოს ყველა ძირითადი ველი. ცვლილება დაუყოვნებლივ შეინახება.
@@ -1024,21 +1209,8 @@ export default function RequestDetailsPage() {
                   </div>
                 )}
 
-                {(canDoctorEdit || isAdmin) ? (
+                {isAdmin ? (
                   <>
-                    {!isAdmin && (
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <div className="text-xs font-bold uppercase text-slate-500">მიმდინარე სტატუსი</div>
-                          <div className="mt-1 font-bold text-slate-900">{request.currentStatus}</div>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <div className="text-xs font-bold uppercase text-slate-500">საბოლოო გადაწყვეტილება</div>
-                          <div className="mt-1 font-bold text-slate-900">{request.finalDecision || '-'}</div>
-                        </div>
-                      </div>
-                    )}
-
                     <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div>
                         <div className="text-sm font-bold text-slate-800">
