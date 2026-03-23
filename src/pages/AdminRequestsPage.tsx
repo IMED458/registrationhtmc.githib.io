@@ -28,7 +28,10 @@ export default function AdminRequestsPage() {
       (snapshot) => {
         const nextRequests = snapshot.docs
           .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
-          .filter((request) => request.adminConfirmationStatus === 'pending' && request.pendingRegistrarUpdate);
+          .filter((request) => (
+            request.adminConfirmationStatus === 'pending' &&
+            (request.pendingRegistrarUpdate || request.pendingDoctorEdit)
+          ));
 
         setRequests(nextRequests);
         setLoading(false);
@@ -64,16 +67,20 @@ export default function AdminRequestsPage() {
         adminConfirmedByUserId: profile.uid,
         adminConfirmedByUserName: profile.fullName,
         pendingRegistrarUpdate: null,
+        pendingDoctorEdit: null,
+        requiresRegistrarAction: false,
         updatedAt: Timestamp.now(),
       });
+
+      const isDoctorEdit = Boolean(request.pendingDoctorEdit && !request.pendingRegistrarUpdate);
 
       await writeAuditLogEntry({
         userId: profile.uid,
         userName: profile.fullName,
         requestId: request.id,
         actionType: 'UPDATE_CONFIRMED',
-        newValue: `ადმინისტრატორმა დაადასტურა რეგისტრატორის რედაქტირება: ${request.patientData.firstName} ${request.patientData.lastName}`,
-        oldValue: request.pendingRegistrarUpdate?.registrarComment || undefined,
+        newValue: `ადმინისტრატორმა დაადასტურა ${isDoctorEdit ? 'ექიმის' : 'რეგისტრატორის'} რედაქტირება: ${request.patientData.firstName} ${request.patientData.lastName}`,
+        oldValue: request.pendingRegistrarUpdate?.registrarComment || request.pendingDoctorEdit?.comment || undefined,
       });
     } catch (error) {
       console.error('Admin confirm request error:', error);
@@ -97,7 +104,7 @@ export default function AdminRequestsPage() {
     <div className="w-full max-w-none space-y-8 pb-12">
       <div>
         <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნები</h2>
-        <p className="text-slate-500">რეგისტრატორის ცვლილებები, რომლებიც ადმინისტრატორის დადასტურებას ელოდება</p>
+        <p className="text-slate-500">რეგისტრატორის და ექიმის ცვლილებები, რომლებიც ადმინისტრატორის დადასტურებას ელოდება</p>
       </div>
 
       {loading ? (
@@ -112,6 +119,21 @@ export default function AdminRequestsPage() {
         <div className="grid grid-cols-1 gap-4">
           {requests.map((request) => (
             <div key={request.id} className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+              {(() => {
+                const isDoctorEdit = Boolean(request.pendingDoctorEdit && !request.pendingRegistrarUpdate);
+                const pendingComment = request.pendingRegistrarUpdate?.registrarComment || request.pendingDoctorEdit?.comment || '-';
+                const editorName =
+                  request.pendingRegistrarUpdate?.requestedByUserName ||
+                  request.pendingDoctorEdit?.editedByUserName ||
+                  request.lastRegistrarEditByUserName ||
+                  request.lastDoctorEditByUserName ||
+                  '-';
+                const editTime =
+                  request.pendingRegistrarUpdate?.requestedAt ||
+                  request.pendingDoctorEdit?.editedAt ||
+                  null;
+
+                return (
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-3">
                   <div>
@@ -125,28 +147,28 @@ export default function AdminRequestsPage() {
 
                   <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                     <div>
-                      <div className="text-xs font-bold uppercase text-amber-700">რეგისტრატორის ახალი სტატუსი</div>
+                      <div className="text-xs font-bold uppercase text-amber-700">ცვლილების ტიპი</div>
+                      <div className="mt-1 font-bold text-slate-900">
+                        {isDoctorEdit ? 'ექიმის/ექთნის რედაქტირება' : 'რეგისტრატორის რედაქტირება'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold uppercase text-amber-700">მიმდინარე სტატუსი</div>
                       <div className="mt-1 font-bold text-slate-900">
                         {request.pendingRegistrarUpdate?.currentStatus || request.currentStatus}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs font-bold uppercase text-amber-700">საბოლოო გადაწყვეტილება</div>
-                      <div className="mt-1 font-bold text-slate-900">
-                        {request.pendingRegistrarUpdate?.finalDecision || request.finalDecision || '-'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold uppercase text-amber-700">რეგისტრატორი</div>
+                      <div className="text-xs font-bold uppercase text-amber-700">რედაქტორი</div>
                       <div className="mt-1 text-slate-700">
-                        {request.pendingRegistrarUpdate?.requestedByUserName || request.lastRegistrarEditByUserName || '-'}
+                        {editorName}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs font-bold uppercase text-amber-700">დრო</div>
                       <div className="mt-1 text-slate-700">
-                        {request.pendingRegistrarUpdate?.requestedAt?.toDate
-                          ? format(request.pendingRegistrarUpdate.requestedAt.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka })
+                        {editTime?.toDate
+                          ? format(editTime.toDate(), 'dd.MM.yyyy HH:mm', { locale: ka })
                           : '-'}
                       </div>
                     </div>
@@ -155,7 +177,7 @@ export default function AdminRequestsPage() {
                   <div>
                     <div className="text-xs font-bold uppercase text-amber-700">კომენტარი</div>
                     <div className="mt-1 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-slate-700">
-                      {request.pendingRegistrarUpdate?.registrarComment || '-'}
+                      {pendingComment}
                     </div>
                   </div>
                 </div>
@@ -180,6 +202,8 @@ export default function AdminRequestsPage() {
                   </button>
                 </div>
               </div>
+                );
+              })()}
             </div>
           ))}
         </div>

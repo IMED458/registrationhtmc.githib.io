@@ -5,14 +5,52 @@ import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
-import { getDiagnosisEntries } from '../icd10Utils';
-import { ClinicalRequest, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
+import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
+import { ClinicalRequest, DiagnosisEntry, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Printer, Save, User } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Plus, Printer, Save, Trash2, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 
 type ConfirmAction = 'save' | 'approve' | null;
+
+type DiagnosisFormRow = DiagnosisEntry & {
+  id: string;
+};
+
+function createDiagnosisRowId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createDiagnosisFormRow(entry?: DiagnosisEntry): DiagnosisFormRow {
+  return {
+    id: createDiagnosisRowId(),
+    icdCode: entry?.icdCode || '',
+    diagnosis: entry?.diagnosis || '',
+    isPrimary: Boolean(entry?.isPrimary),
+  };
+}
+
+function sanitizeDiagnosisRows(rows: DiagnosisFormRow[]) {
+  const normalizedRows = rows
+    .map((row) => ({
+      icdCode: normalizeIcdCode(row.icdCode),
+      diagnosis: row.diagnosis.trim(),
+      isPrimary: Boolean(row.isPrimary),
+    }))
+    .filter((row) => row.icdCode || row.diagnosis);
+
+  if (normalizedRows.length === 1) {
+    return [
+      {
+        ...normalizedRows[0],
+        isPrimary: true,
+      },
+    ];
+  }
+
+  return normalizedRows;
+}
 
 function getUpdateSummary(status: string, finalDecision?: string) {
   return `${status}${finalDecision ? ` / ${finalDecision}` : ''}`;
@@ -56,8 +94,24 @@ function getPendingDoctorEditSignature(update?: PendingDoctorEdit | null) {
   ].join('|');
 }
 
+function getPatientSignature(request: ClinicalRequest) {
+  return [
+    request.patientData.firstName || '',
+    request.patientData.lastName || '',
+    request.patientData.historyNumber || '',
+    request.patientData.personalId || '',
+    request.patientData.birthDate || '',
+    request.patientData.phone || '',
+    request.patientData.address || '',
+    request.icdCode || '',
+    request.diagnosis || '',
+    JSON.stringify(request.diagnoses || []),
+  ].join('|');
+}
+
 function hasRegistrarSyncChange(current: ClinicalRequest, next: ClinicalRequest) {
   return (
+    getPatientSignature(current) !== getPatientSignature(next) ||
     current.currentStatus !== next.currentStatus ||
     (current.finalDecision || '') !== (next.finalDecision || '') ||
     (current.registrarComment || '') !== (next.registrarComment || '') ||
@@ -106,6 +160,14 @@ export default function RequestDetailsPage() {
   const autoStatusSyncRef = useRef(false);
 
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    historyNumber: '',
+    personalId: '',
+    birthDate: '',
+    phone: '',
+    address: '',
+    diagnoses: [createDiagnosisFormRow({ isPrimary: true })],
     currentStatus: '',
     finalDecision: '',
     registrarComment: '',
@@ -124,7 +186,7 @@ export default function RequestDetailsPage() {
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
     : null;
-  const pendingDoctorEdit = request?.requiresRegistrarAction ? request?.pendingDoctorEdit || null : null;
+  const pendingDoctorEdit = request?.pendingDoctorEdit || null;
 
   useEffect(() => {
     if (!id || !profile || !request || !isRegistrarOnly) {
@@ -188,9 +250,9 @@ export default function RequestDetailsPage() {
           if (current && hasRegistrarSyncChange(current, nextRequest) && !updating && !confirmAction) {
             if (current.adminConfirmationStatus !== nextRequest.adminConfirmationStatus) {
               if (nextRequest.adminConfirmationStatus === 'confirmed') {
-                setSyncNoticeMessage('ადმინმა რეგისტრატორის რედაქტირება დაადასტურა.');
+                setSyncNoticeMessage('ადმინმა ჩანაწერის ცვლილება დაადასტურა.');
               } else if (nextRequest.adminConfirmationStatus === 'pending') {
-                setSyncNoticeMessage('რეგისტრატორის ცვლილება ჩაიწერა და ადმინთან შეტყობინება გაიგზავნა.');
+                setSyncNoticeMessage('ცვლილება ჩაიწერა და ადმინთან შეტყობინება გაიგზავნა.');
               }
             } else {
               setSyncNoticeMessage('ჩანაწერი realtime რეჟიმში განახლდა.');
@@ -201,8 +263,22 @@ export default function RequestDetailsPage() {
         });
 
         if (!updating && !confirmAction) {
+          const diagnosisRows = getDiagnosisEntries(data).map((entry) => createDiagnosisFormRow({
+            icdCode: entry.icdCode || entry.code,
+            diagnosis: entry.diagnosis || entry.description,
+            isPrimary: entry.isExplicitlyPrimary || entry.isPrimary,
+          }));
+
           setFormData((current) => ({
             ...current,
+            firstName: data.patientData.firstName || '',
+            lastName: data.patientData.lastName || '',
+            historyNumber: data.patientData.historyNumber || '',
+            personalId: data.patientData.personalId || '',
+            birthDate: data.patientData.birthDate || '',
+            phone: data.patientData.phone || '',
+            address: data.patientData.address || '',
+            diagnoses: diagnosisRows.length ? diagnosisRows : [createDiagnosisFormRow({ isPrimary: true })],
             currentStatus: data.currentStatus,
             finalDecision: data.finalDecision || '',
             registrarComment: data.registrarComment || '',
@@ -249,6 +325,83 @@ export default function RequestDetailsPage() {
     ]),
   );
 
+  const updateDiagnosisRow = (rowId: string, changes: Partial<DiagnosisFormRow>) => {
+    setFormData((current) => ({
+      ...current,
+      diagnoses: current.diagnoses.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              ...changes,
+            }
+          : row,
+      ),
+    }));
+  };
+
+  const addDiagnosisRow = () => {
+    setFormData((current) => ({
+      ...current,
+      diagnoses: [
+        ...(current.diagnoses.length === 1
+          ? current.diagnoses.map((row) => ({
+              ...row,
+              isPrimary: false,
+            }))
+          : current.diagnoses),
+        createDiagnosisFormRow(),
+      ],
+    }));
+  };
+
+  const removeDiagnosisRow = (rowId: string) => {
+    setFormData((current) => {
+      const nextRows = current.diagnoses.filter((row) => row.id !== rowId);
+
+      if (nextRows.length === 0) {
+        return {
+          ...current,
+          diagnoses: [createDiagnosisFormRow({ isPrimary: true })],
+        };
+      }
+
+      if (nextRows.length === 1) {
+        return {
+          ...current,
+          diagnoses: nextRows.map((row) => ({
+            ...row,
+            isPrimary: true,
+          })),
+        };
+      }
+
+      return {
+        ...current,
+        diagnoses: nextRows,
+      };
+    });
+  };
+
+  const togglePrimaryDiagnosis = (rowId: string) => {
+    setFormData((current) => {
+      if (current.diagnoses.length === 1) {
+        return current;
+      }
+
+      return {
+        ...current,
+        diagnoses: current.diagnoses.map((row) =>
+          row.id === rowId
+            ? {
+                ...row,
+                isPrimary: !row.isPrimary,
+              }
+            : row,
+        ),
+      };
+    });
+  };
+
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !profile || !request) {
@@ -265,12 +418,26 @@ export default function RequestDetailsPage() {
       return;
     }
 
+    if (canDoctorEdit) {
+      const diagnoses = sanitizeDiagnosisRows(formData.diagnoses);
+
+      if (request.requestedAction !== 'კვლევა' && diagnoses.length === 0) {
+        setFormError('მიუთითეთ მინიმუმ ერთი დიაგნოზი.');
+        return;
+      }
+
+      if (diagnoses.some((entry) => !entry.icdCode || !entry.diagnosis)) {
+        setFormError('თითოეულ დიაგნოზზე მიუთითეთ ICD-10 კოდიც და განმარტებაც.');
+        return;
+      }
+    }
+
     setFormError('');
     setConfirmAction('save');
   };
 
   const handleApprovePendingUpdate = () => {
-    if (!pendingUpdate) {
+    if (!pendingUpdate && !pendingDoctorEdit) {
       return;
     }
 
@@ -287,13 +454,17 @@ export default function RequestDetailsPage() {
     try {
       const requestRef = doc(db, 'requests', id);
 
-      if (confirmAction === 'approve' && pendingUpdate) {
+      if (confirmAction === 'approve' && (pendingUpdate || pendingDoctorEdit)) {
+        const confirmingDoctorEdit = Boolean(pendingDoctorEdit && !pendingUpdate);
+
         await updateDoc(requestRef, {
           adminConfirmationStatus: 'confirmed',
           adminConfirmedAt: Timestamp.now(),
           adminConfirmedByUserId: profile.uid,
           adminConfirmedByUserName: profile.fullName,
           pendingRegistrarUpdate: null,
+          pendingDoctorEdit: null,
+          requiresRegistrarAction: false,
           updatedAt: Timestamp.now(),
         });
 
@@ -303,13 +474,17 @@ export default function RequestDetailsPage() {
           requestId: id,
           actionType: 'UPDATE_CONFIRMED',
           oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-          newValue: 'ადმინისტრატორმა დაადასტურა რეგისტრატორის რედაქტირება',
+          newValue: confirmingDoctorEdit
+            ? 'ადმინისტრატორმა დაადასტურა ექიმის რედაქტირება'
+            : 'ადმინისტრატორმა დაადასტურა რეგისტრატორის რედაქტირება',
         });
 
         setConfirmAction(null);
         setSuccessDialogContent({
           title: 'რედაქტირება დადასტურდა',
-          message: 'რეგისტრატორის ცვლილება უკვე დადასტურებულია ადმინისტრატორის მიერ.',
+          message: confirmingDoctorEdit
+            ? 'ექიმის ცვლილება უკვე დადასტურებულია ადმინისტრატორის მიერ.'
+            : 'რეგისტრატორის ცვლილება უკვე დადასტურებულია ადმინისტრატორის მიერ.',
         });
         return;
       }
@@ -369,6 +544,8 @@ export default function RequestDetailsPage() {
       }
 
       if (canDoctorEdit) {
+        const diagnoses = sanitizeDiagnosisRows(formData.diagnoses);
+        const representativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses });
         const doctorNotification: PendingDoctorEdit = {
           comment: formData.doctorEditComment.trim(),
           editedAt: Timestamp.now(),
@@ -378,14 +555,30 @@ export default function RequestDetailsPage() {
         };
 
         await updateDoc(requestRef, {
-          ...baseUpdate,
-          requiresRegistrarAction: true,
+          patientData: {
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            historyNumber: formData.historyNumber.trim(),
+            personalId: formData.personalId.trim(),
+            birthDate: formData.birthDate,
+            phone: formData.phone.trim(),
+            address: formData.address.trim(),
+          },
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          requiresRegistrarAction: false,
           pendingDoctorEdit: doctorNotification,
           lastDoctorEditAt: Timestamp.now(),
           lastDoctorEditByUserId: profile.uid,
           lastDoctorEditByUserName: profile.fullName,
           lastDoctorEditByUserEmail: profile.email,
           lastDoctorEditComment: formData.doctorEditComment.trim(),
+          adminConfirmationStatus: 'pending',
+          adminConfirmedAt: null,
+          adminConfirmedByUserId: '',
+          adminConfirmedByUserName: '',
+          updatedAt: Timestamp.now(),
         });
 
         await writeAuditLogEntry({
@@ -393,14 +586,14 @@ export default function RequestDetailsPage() {
           userName: profile.fullName,
           requestId: id,
           actionType: 'DOCTOR_EDIT',
-          oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-          newValue: `${getUpdateSummary(formData.currentStatus, formData.finalDecision)} / კომენტარი: ${formData.doctorEditComment.trim()}`,
+          oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${request.icdCode || request.diagnosis || '-'}`,
+          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${representativeDiagnosis?.code || representativeDiagnosis?.combined || '-'} / კომენტარი: ${formData.doctorEditComment.trim()}`,
         });
 
         setConfirmAction(null);
         setSuccessDialogContent({
           title: 'ცვლილება შენახულია',
-          message: 'ჩანაწერი განახლდა და რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა.',
+          message: 'პაციენტის მონაცემები და დიაგნოზი განახლდა, ცვლილება მონიშნულია რედაქტირებულად და ადმინისტრატორთან შეტყობინება გაიგზავნა.',
         });
         return;
       }
@@ -458,11 +651,13 @@ export default function RequestDetailsPage() {
         title: confirmAction === 'approve' ? 'რედაქტირების დადასტურება' : 'სტატუსის დადასტურება',
         message:
           confirmAction === 'approve'
-            ? 'ნამდვილად გსურთ რეგისტრატორის მიერ შეტანილი ცვლილების დადასტურება?'
+            ? pendingDoctorEdit && !pendingUpdate
+              ? 'ნამდვილად გსურთ ექიმის მიერ შეტანილი ცვლილების დადასტურება?'
+              : 'ნამდვილად გსურთ რეგისტრატორის მიერ შეტანილი ცვლილების დადასტურება?'
             : isRegistrarOnly
               ? 'ცვლილება დაუყოვნებლივ შეინახება და ადმინთან შეტყობინებაც გაიგზავნება. გაგრძელება გსურთ?'
               : canDoctorEdit
-                ? 'ცვლილება დაუყოვნებლივ შეინახება და რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. გაგრძელება გსურთ?'
+                ? 'პაციენტის მონაცემები და დიაგნოზი დაუყოვნებლივ განახლდება, ჩანაწერი რედაქტირებულად მოინიშნება და ადმინთან შეტყობინება გაიგზავნება. გაგრძელება გსურთ?'
                 : 'ნამდვილად გსურთ სტატუსის განახლება?',
         confirmLabel: confirmAction === 'approve' ? 'დადასტურება' : 'OK',
       }
@@ -637,9 +832,13 @@ export default function RequestDetailsPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 uppercase font-bold">რეგისტრატორის განმეორებითი მოქმედება</div>
-                      <div className={`font-bold ${request.requiresRegistrarAction ? 'text-sky-600' : 'text-slate-500'}`}>
-                        {request.requiresRegistrarAction ? 'ელოდება ხელახლა მოქმედებას' : 'დამუშავებულია'}
+                      <div className="text-xs text-slate-400 uppercase font-bold">ადმინის დადასტურება ექიმის რედაქტირებაზე</div>
+                      <div className={`font-bold ${request.adminConfirmationStatus === 'pending' ? 'text-amber-700' : request.adminConfirmationStatus === 'confirmed' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                        {request.adminConfirmationStatus === 'pending'
+                          ? 'ელოდება დადასტურებას'
+                          : request.adminConfirmationStatus === 'confirmed'
+                            ? 'დადასტურებულია'
+                            : 'დამუშავებულია'}
                       </div>
                     </div>
                   </>
@@ -654,13 +853,13 @@ export default function RequestDetailsPage() {
             <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
               <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-sky-900">ხელახლა დასამუშავებელი ცვლილება</h3>
+                <h3 className="font-bold text-sky-900">ექიმის რედაქტირება</h3>
               </div>
               <div className="space-y-4 p-4 sm:p-6">
                 <p className="text-sm leading-6 text-sky-900">
                   {isRegistrar || isAdmin
-                    ? 'ექიმმა/ექთანმა ჩანაწერი შეცვალა და ახლა ხელახლა მოქმედებას ელოდება.'
-                    : 'თქვენი ცვლილება რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა.'}
+                    ? 'ექიმმა/ექთანმა პაციენტის მონაცემები ან დიაგნოზები შეცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
+                    : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'}
                 </p>
                 <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   <div>
@@ -678,6 +877,16 @@ export default function RequestDetailsPage() {
                     {pendingDoctorEdit.comment}
                   </div>
                 </div>
+                {isAdmin && request.adminConfirmationStatus === 'pending' && (
+                  <button
+                    type="button"
+                    onClick={handleApprovePendingUpdate}
+                    disabled={updating}
+                    className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    დადასტურება
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -739,7 +948,7 @@ export default function RequestDetailsPage() {
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24">
               <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-bold text-slate-700">სტატუსის მართვა</h3>
+                <h3 className="font-bold text-slate-700">{canDoctorEdit ? 'მონაცემების რედაქტირება' : 'სტატუსის მართვა'}</h3>
               </div>
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
                 {isRegistrarOnly && (
@@ -760,35 +969,204 @@ export default function RequestDetailsPage() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">მიმდინარე სტატუსი</label>
-                  <select
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                    value={formData.currentStatus}
-                    onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">საბოლოო გადაწყვეტილება</label>
-                  <select
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
-                    value={formData.finalDecision}
-                    onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
-                  >
-                    <option value="">აირჩიეთ...</option>
-                    {finalDecisionOptions.map((decision) => (
-                      <option key={decision} value={decision}>{decision}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {!canDoctorEdit && (
+                {canDoctorEdit ? (
                   <>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="text-xs font-bold uppercase text-slate-500">მიმდინარე სტატუსი</div>
+                        <div className="mt-1 font-bold text-slate-900">{request.currentStatus}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="text-xs font-bold uppercase text-slate-500">საბოლოო გადაწყვეტილება</div>
+                        <div className="mt-1 font-bold text-slate-900">{request.finalDecision || '-'}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div>
+                        <div className="text-sm font-bold text-slate-800">პაციენტის მონაცემების რედაქტირება</div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          სტატუსის მართვა ექიმისთვის გამორთულია. აქედან შეგიძლიათ შეცვალოთ მხოლოდ პაციენტის მონაცემები და დიაგნოზები.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">სახელი</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.firstName}
+                            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">გვარი</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.lastName}
+                            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">ისტორიის ნომერი</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.historyNumber}
+                            onChange={(e) => setFormData({ ...formData, historyNumber: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">პირადი ნომერი</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.personalId}
+                            onChange={(e) => setFormData({ ...formData, personalId: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">დაბადების თარიღი</label>
+                          <input
+                            type="date"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.birthDate}
+                            onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">ტელეფონი</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <label className="text-sm font-bold text-slate-700">მისამართი</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.address}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">დიაგნოზების რედაქტირება</div>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                            შეგიძლიათ რამდენიმე დიაგნოზის შენახვა და საჭირო დიაგნოზების წამყვანად მონიშვნაც.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addDiagnosisRow}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700"
+                        >
+                          <Plus className="h-4 w-4" />
+                          დიაგნოზის დამატება
+                        </button>
+                      </div>
+
+                      {formData.diagnoses.map((diagnosisRow, index) => {
+                        const isSingleDiagnosis = formData.diagnoses.length === 1;
+
+                        return (
+                          <div key={diagnosisRow.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="text-sm font-bold text-slate-700">დიაგნოზი #{index + 1}</div>
+                              <div className="flex flex-wrap items-center gap-3">
+                                <label className={`inline-flex items-center gap-2 text-sm font-bold ${isSingleDiagnosis ? 'text-sky-700' : 'text-slate-600'}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSingleDiagnosis ? true : Boolean(diagnosisRow.isPrimary)}
+                                    disabled={isSingleDiagnosis}
+                                    onChange={() => togglePrimaryDiagnosis(diagnosisRow.id)}
+                                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                  />
+                                  {isSingleDiagnosis ? 'წამყვანი (ავტომატურად)' : 'წამყვანი'}
+                                </label>
+                                {formData.diagnoses.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeDiagnosisRow(diagnosisRow.id)}
+                                    className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    წაშლა
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">ICD-10 კოდი</label>
+                                <input
+                                  type="text"
+                                  placeholder="მაგ: R10.4"
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                                  value={diagnosisRow.icdCode}
+                                  onChange={(e) => updateDiagnosisRow(diagnosisRow.id, { icdCode: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">დიაგნოზის განმარტება</label>
+                                <input
+                                  type="text"
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                                  value={diagnosisRow.diagnosis}
+                                  onChange={(e) => updateDiagnosisRow(diagnosisRow.id, { diagnosis: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {formData.diagnoses.length > 1 && !formData.diagnoses.some((row) => row.isPrimary) && (
+                        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                          თუ არცერთ დიაგნოზს არ მონიშნავთ, სისტემა ყველა დიაგნოზს წამყვანად ჩათვლის.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">მიმდინარე სტატუსი</label>
+                      <select
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                        value={formData.currentStatus}
+                        onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
+                      >
+                        {statusOptions.map((status) => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700">საბოლოო გადაწყვეტილება</label>
+                      <select
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                        value={formData.finalDecision}
+                        onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
+                      >
+                        <option value="">აირჩიეთ...</option>
+                        {finalDecisionOptions.map((decision) => (
+                          <option key={decision} value={decision}>{decision}</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-slate-700">რეგისტრატორის სახელი, გვარი</label>
@@ -842,7 +1220,7 @@ export default function RequestDetailsPage() {
 
                 <button
                   type="submit"
-                  disabled={updating}
+                  disabled={updating || (canDoctorEdit && !formData.doctorEditComment.trim())}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}

@@ -63,9 +63,27 @@ function getCreatedAtLabel(request: ClinicalRequest) {
     : '-';
 }
 
+function hasDoctorEditPendingApproval(request: ClinicalRequest) {
+  return Boolean(request.pendingDoctorEdit && request.adminConfirmationStatus === 'pending');
+}
+
+function hasAnyEdit(request: ClinicalRequest) {
+  return Boolean(request.lastRegistrarEditAt || request.lastDoctorEditAt);
+}
+
 function getRegistrarEditLabel(request: ClinicalRequest) {
-  if (!request.lastRegistrarEditAt) {
+  if (!hasAnyEdit(request)) {
     return '';
+  }
+
+  if (hasDoctorEditPendingApproval(request)) {
+    return 'ექიმმა დაარედაქტირა / ადმინის დადასტურება ელოდება';
+  }
+
+  if (request.lastDoctorEditAt && !request.lastRegistrarEditAt) {
+    return request.adminConfirmationStatus === 'confirmed'
+      ? 'ექიმმა დაარედაქტირა / ადმინმა დაადასტურა'
+      : 'ექიმმა დაარედაქტირა';
   }
 
   return request.adminConfirmationStatus === 'pending'
@@ -80,7 +98,7 @@ function needsRegistrarRework(request: ClinicalRequest) {
 }
 
 function getPatientNameTextClass(request: ClinicalRequest) {
-  return needsRegistrarRework(request)
+  return needsRegistrarRework(request) || hasDoctorEditPendingApproval(request)
     ? 'text-sky-600'
     : 'text-slate-900';
 }
@@ -151,7 +169,7 @@ export default function Dashboard() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
   const pendingApprovals = requests.filter(
-    (request) => request.adminConfirmationStatus === 'pending' && Boolean(request.pendingRegistrarUpdate),
+    (request) => request.adminConfirmationStatus === 'pending' && Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit),
   );
 
   useEffect(() => {
@@ -330,7 +348,7 @@ export default function Dashboard() {
                 ადმინის დადასტურებას ელოდება {pendingApprovals.length} ცვლილება
               </div>
               <p className="mt-1 text-sm text-amber-800">
-                რეგისტრატორის მიერ შეცვლილი ჩანაწერები აქვე ჩანს და ადმინისტრირების გვერდიდანაც შეგიძლიათ მათი დადასტურება.
+                აქ ჩანს როგორც რეგისტრატორის, ისე ექიმის მიერ დარედაქტირებული ჩანაწერები და ადმინისტრირების გვერდიდანაც შეგიძლიათ მათი დადასტურება.
               </p>
             </div>
           </div>
@@ -347,11 +365,12 @@ export default function Dashboard() {
                   {request.patientData.firstName} {request.patientData.lastName}
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
-                  {request.pendingRegistrarUpdate?.requestedByUserName || 'რეგისტრატორი'}-მა შეცვალა ჩანაწერი:
+                  {request.pendingRegistrarUpdate?.requestedByUserName || request.pendingDoctorEdit?.editedByUserName || 'თანამშრომელი'}-მა შეცვალა ჩანაწერი:
                 </div>
                 <div className="mt-2 text-sm font-bold text-amber-800">
-                  {request.pendingRegistrarUpdate?.currentStatus}
-                  {request.pendingRegistrarUpdate?.finalDecision ? ` / ${request.pendingRegistrarUpdate.finalDecision}` : ''}
+                  {request.pendingRegistrarUpdate
+                    ? `${request.pendingRegistrarUpdate.currentStatus}${request.pendingRegistrarUpdate.finalDecision ? ` / ${request.pendingRegistrarUpdate.finalDecision}` : ''}`
+                    : 'პაციენტის მონაცემები / დიაგნოზები დარედაქტირდა'}
                 </div>
               </button>
             ))}
@@ -435,7 +454,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                {req.lastRegistrarEditAt && (
+                {hasAnyEdit(req) && (
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">რედაქტირების სტატუსი</div>
                     <div className={`mt-1 text-sm font-bold ${getRegistrarEditTextClass(req)}`}>
@@ -556,7 +575,7 @@ export default function Dashboard() {
                             {req.finalDecision}
                           </div>
                         )}
-                        {req.lastRegistrarEditAt && (
+                        {hasAnyEdit(req) && (
                           <div className={`max-w-xs text-sm font-bold leading-5 whitespace-normal ${getRegistrarEditTextClass(req)}`}>
                             {getRegistrarEditLabel(req)}
                           </div>

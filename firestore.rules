@@ -85,8 +85,10 @@ service cloud.firestore {
 
     function doctorDirectEditFieldsOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        "currentStatus",
-        "finalDecision",
+        "patientData",
+        "diagnosis",
+        "icdCode",
+        "diagnoses",
         "requiresRegistrarAction",
         "pendingDoctorEdit",
         "lastDoctorEditAt",
@@ -94,16 +96,22 @@ service cloud.firestore {
         "lastDoctorEditByUserName",
         "lastDoctorEditByUserEmail",
         "lastDoctorEditComment",
+        "adminConfirmationStatus",
+        "adminConfirmedAt",
+        "adminConfirmedByUserId",
+        "adminConfirmedByUserName",
         "updatedAt"
       ]);
     }
 
     function doctorDirectEditPayloadIsValid() {
-      return request.resource.data.requiresRegistrarAction == true &&
+      return request.resource.data.requiresRegistrarAction == false &&
+        request.resource.data.patientData != null &&
         request.resource.data.lastDoctorEditComment is string &&
         request.resource.data.lastDoctorEditComment.size() > 0 &&
         request.resource.data.lastDoctorEditByUserId == request.auth.uid &&
         request.resource.data.lastDoctorEditByUserEmail == userEmail() &&
+        request.resource.data.adminConfirmationStatus == "pending" &&
         request.resource.data.pendingDoctorEdit != null &&
         request.resource.data.pendingDoctorEdit.comment is string &&
         request.resource.data.pendingDoctorEdit.comment.size() > 0 &&
