@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
@@ -51,10 +51,17 @@ function getCreatedAtLabel(request: ClinicalRequest) {
     : '-';
 }
 
+function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
+  return [...requests].sort(
+    (left, right) => getRequestTimestampValue(right) - getRequestTimestampValue(left),
+  );
+}
+
 export default function Dashboard() {
   const { profile, isDoctorOrNurse, isRegistrar, isAdmin } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [requestsError, setRequestsError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ყველა');
   const [deletingRequestId, setDeletingRequestId] = useState('');
@@ -67,6 +74,7 @@ export default function Dashboard() {
     }
 
     setLoading(true);
+    setRequestsError('');
 
     if (isDoctorOrNurse && !isAdmin) {
       const requestsByUid = new Map<string, ClinicalRequest>();
@@ -80,11 +88,7 @@ export default function Dashboard() {
           ...requestsByEmail.entries(),
         ]);
 
-        const sorted = Array.from(merged.values()).sort(
-          (left, right) => getRequestTimestampValue(right) - getRequestTimestampValue(left),
-        );
-
-        setRequests(sorted);
+        setRequests(sortRequestsByCreatedAt(Array.from(merged.values())));
 
         if (uidLoaded && emailLoaded) {
           setLoading(false);
@@ -103,6 +107,13 @@ export default function Dashboard() {
         },
         (error) => {
           console.error('Firestore Error:', error);
+          setRequestsError(
+            getFirebaseActionErrorMessage(error, {
+              fallback: 'მოთხოვნების ჩატვირთვა ვერ მოხერხდა.',
+              permissionDenied:
+                'რეგისტრატურის/მომხმარებლის მოთხოვნების წაკითხვა ვერ მოხერხდა. გადაამოწმეთ Firestore Rules.',
+            }),
+          );
           uidLoaded = true;
           syncRequests();
         },
@@ -123,6 +134,13 @@ export default function Dashboard() {
           },
           (error) => {
             console.error('Firestore Error:', error);
+            setRequestsError(
+              getFirebaseActionErrorMessage(error, {
+                fallback: 'მოთხოვნების ჩატვირთვა ვერ მოხერხდა.',
+                permissionDenied:
+                  'მოთხოვნების წაკითხვა ვერ მოხერხდა. გადაამოწმეთ Firestore Rules.',
+              }),
+            );
             emailLoaded = true;
             syncRequests();
           },
@@ -137,14 +155,22 @@ export default function Dashboard() {
     }
 
     const unsubscribe = onSnapshot(
-      query(collection(db, 'requests'), orderBy('createdAt', 'desc')),
+      collection(db, 'requests'),
       (snapshot) => {
         const docs = snapshot.docs.map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest));
-        setRequests(docs);
+        setRequests(sortRequestsByCreatedAt(docs));
+        setRequestsError('');
         setLoading(false);
       },
       (error) => {
         console.error('Firestore Error:', error);
+        setRequestsError(
+          getFirebaseActionErrorMessage(error, {
+            fallback: 'შემოსული მოთხოვნების ჩატვირთვა ვერ მოხერხდა.',
+            permissionDenied:
+              'რეგისტრატურის პანელში მოთხოვნების წაკითხვა ვერ მოხერხდა. გადაამოწმეთ Firestore Rules.',
+          }),
+        );
         setLoading(false);
       },
     );
@@ -286,6 +312,12 @@ export default function Dashboard() {
       {feedbackMessage && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {feedbackMessage}
+        </div>
+      )}
+
+      {requestsError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {requestsError}
         </div>
       )}
 

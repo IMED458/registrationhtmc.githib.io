@@ -1,15 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    function userEmail() {
+      return isAuthenticated() && request.auth.token.email != null
+        ? request.auth.token.email
+        : "";
+    }
+
     function isVerifiedEmail() {
-      return isAuthenticated() &&
-        request.auth.token.email != null &&
-        request.auth.token.email_verified == true;
+      return isAuthenticated() && request.auth.token.email_verified == true;
     }
 
     function isPasswordProvider() {
@@ -18,33 +21,42 @@ service cloud.firestore {
         request.auth.token.firebase.sign_in_provider == "password";
     }
 
+    function emailRole() {
+      return userEmail() == "imedashviligio27@gmail.com" ? "admin" :
+        userEmail() == "eringorokva@gmail.com" ? "doctor" :
+        userEmail() == "emergencyhtmc14@gmail.com" ? "registrar" :
+        "";
+    }
+
+    function isAllowedProvider() {
+      return isVerifiedEmail() || isPasswordProvider();
+    }
+
     function hasGlobalSettings() {
       return exists(/databases/$(database)/documents/settings/global);
     }
 
     function globalSettings() {
-      return get(/databases/$(database)/documents/settings/global).data;
+      return hasGlobalSettings()
+        ? get(/databases/$(database)/documents/settings/global).data
+        : {};
     }
 
-    function emailRole() {
-      return request.auth.token.email == "imedashviligio27@gmail.com" ? "admin" :
-        request.auth.token.email == "eringorokva@gmail.com" ? "doctor" :
-        request.auth.token.email == "emergencyhtmc14@gmail.com" ? "registrar" :
-        "";
+    function disabledEmails() {
+      return hasGlobalSettings() && ('disabledEmails' in globalSettings())
+        ? globalSettings().disabledEmails
+        : [];
     }
 
     function isAllowedEmailCandidate() {
       return isAuthenticated() &&
-        request.auth.token.email != null &&
+        userEmail() != "" &&
         emailRole() != "" &&
-        (isVerifiedEmail() || isPasswordProvider());
+        isAllowedProvider();
     }
 
     function isEmailDisabled() {
-      return isAllowedEmailCandidate() &&
-        hasGlobalSettings() &&
-        ('disabledEmails' in globalSettings()) &&
-        request.auth.token.email in globalSettings().disabledEmails;
+      return isAllowedEmailCandidate() && userEmail() in disabledEmails();
     }
 
     function isAllowedEmail() {
@@ -56,9 +68,13 @@ service cloud.firestore {
     }
 
     function getUserRole() {
-      return hasUserProfile()
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : emailRole();
+      return emailRole() != ""
+        ? emailRole()
+        : (
+            hasUserProfile()
+              ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+              : ""
+          );
     }
 
     function hasRole(role) {
@@ -80,10 +96,7 @@ service cloud.firestore {
     function requestBelongsToCurrentUser(requestData) {
       return isAuthenticated() && (
         requestData.createdByUserId == request.auth.uid ||
-        (
-          request.auth.token.email != null &&
-          requestData.createdByUserEmail == request.auth.token.email
-        )
+        requestData.createdByUserEmail == userEmail()
       );
     }
 
@@ -92,15 +105,15 @@ service cloud.firestore {
     }
 
     function newRequestBelongsToCurrentUser() {
-      return request.auth.token.email != null &&
+      return isAuthenticated() &&
         request.resource.data.createdByUserId == request.auth.uid &&
-        request.resource.data.createdByUserEmail == request.auth.token.email;
+        request.resource.data.createdByUserEmail == userEmail();
     }
 
     function ownUserProfileMatchesAllowedRole(userId) {
       return request.auth.uid == userId &&
         request.resource.data.uid == request.auth.uid &&
-        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.email == userEmail() &&
         request.resource.data.role == emailRole();
     }
 
@@ -116,14 +129,17 @@ service cloud.firestore {
         isRegistrar() ||
         isRequestOwner()
       );
+
       allow create: if isAllowedEmail() &&
         (isDoctorOrNurse() || isAdmin()) &&
         newRequestBelongsToCurrentUser();
+
       allow update: if isAllowedEmail() && (
         isRegistrar() ||
         isAdmin() ||
         (isDoctorOrNurse() && isRequestOwner() && resource.data.currentStatus == 'ახალი')
       );
+
       allow delete: if isAllowedEmail() && isAdmin();
     }
 
