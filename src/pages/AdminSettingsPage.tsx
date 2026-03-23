@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { addDoc, collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { DEFAULT_SYSTEM_SETTINGS } from '../defaultSystemSettings';
 import { SystemSettings, AuditLog } from '../types';
 import { CheckCircle2, Database, History, Loader2, Save } from 'lucide-react';
 import { format } from 'date-fns';
@@ -9,20 +10,7 @@ import { ka } from 'date-fns/locale';
 
 export default function AdminSettingsPage() {
   const { isAdmin, profile } = useAuth();
-  const [settings, setSettings] = useState<SystemSettings>({
-    googleSheetsId: '',
-    googleDriveFolderId: '',
-    sheetName: 'Sheet1',
-    columnMapping: {
-      firstName: 'First Name',
-      lastName: 'Last Name',
-      historyNumber: 'History Number',
-      personalId: 'Personal ID',
-      birthDate: 'Birth Date',
-      phone: 'Phone',
-      address: 'Address'
-    }
-  });
+  const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -92,13 +80,16 @@ export default function AdminSettingsPage() {
             </div>
             <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Google Sheets ID</label>
+                <label className="text-sm font-bold text-slate-700">Google Sheets ბმული ან ID</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={settings.googleSheetsId}
                   onChange={(e) => setSettings({ ...settings, googleSheetsId: e.target.value })}
                 />
+                <p className="text-xs text-slate-400">
+                  შეგიძლიათ მიუთითოთ სრული Google Sheets ბმული. ამჟამინდელი წყარო უკვე შევსებულია.
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">Sheet-ის სახელი</label>
@@ -107,6 +98,15 @@ export default function AdminSettingsPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={settings.sheetName}
                   onChange={(e) => setSettings({ ...settings, sheetName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Sheet GID</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  value={settings.sheetGid || ''}
+                  onChange={(e) => setSettings({ ...settings, sheetGid: e.target.value })}
                 />
               </div>
 

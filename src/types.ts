@@ -56,6 +56,7 @@ export interface SystemSettings {
   googleSheetsId: string;
   googleDriveFolderId?: string;
   sheetName?: string;
+  sheetGid?: string;
   columnMapping: {
     firstName: string;
     lastName: string;
