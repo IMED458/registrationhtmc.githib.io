@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
@@ -20,6 +20,7 @@ export default function RequestDetailsPage() {
   const [updating, setUpdating] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [syncNoticeVisible, setSyncNoticeVisible] = useState(false);
   
   const [formData, setFormData] = useState({
     currentStatus: '',
@@ -30,33 +31,57 @@ export default function RequestDetailsPage() {
   });
 
   useEffect(() => {
-    const fetchRequest = async () => {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
+    if (!id) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const docSnap = await getDoc(doc(db, 'requests', id));
+    const unsubscribe = onSnapshot(
+      doc(db, 'requests', id),
+      (docSnap) => {
+        if (!docSnap.exists()) {
+          setRequest(null);
+          setLoading(false);
+          return;
+        }
 
-        if (docSnap.exists()) {
-          const data = docSnap.data() as ClinicalRequest;
-          setRequest({ ...data, id: docSnap.id });
-          setFormData({
+        const data = docSnap.data() as ClinicalRequest;
+        const nextRequest = { ...data, id: docSnap.id };
+
+        setRequest((current) => {
+          if (
+            current &&
+            current.currentStatus !== nextRequest.currentStatus &&
+            !updating &&
+            !showUpdateConfirm
+          ) {
+            setSyncNoticeVisible(true);
+          }
+
+          return nextRequest;
+        });
+
+        if (!updating && !showUpdateConfirm) {
+          setFormData((current) => ({
+            ...current,
             currentStatus: data.currentStatus,
             finalDecision: data.finalDecision || '',
             registrarComment: data.registrarComment || '',
             registrarName: data.registrarName || '',
-            formFillerName: data.formFillerName || ''
-          });
+            formFillerName: data.formFillerName || '',
+          }));
         }
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchRequest();
-  }, [id]);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Request sync error:', error);
+        setLoading(false);
+      },
+    );
+
+    return unsubscribe;
+  }, [id, showUpdateConfirm, updating]);
 
   useEffect(() => {
     if (!profile || (!isRegistrar && !isAdmin)) {
@@ -137,6 +162,19 @@ export default function RequestDetailsPage() {
 
   return (
     <div className="w-full max-w-none space-y-6 pb-12">
+      {syncNoticeVisible && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          რეგისტრატორის ცვლილება პირდაპირ ჩაიტვირთა.
+          <button
+            type="button"
+            onClick={() => setSyncNoticeVisible(false)}
+            className="ml-3 font-bold text-blue-800"
+          >
+            დახურვა
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">

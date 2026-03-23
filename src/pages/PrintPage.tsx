@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { ClinicalRequest } from '../types';
@@ -15,15 +15,28 @@ export default function PrintPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRequest = async () => {
-      if (!id) return;
-      const docSnap = await getDoc(doc(db, 'requests', id));
-      if (docSnap.exists()) {
-        setRequest({ ...docSnap.data(), id: docSnap.id } as ClinicalRequest);
-      }
+    if (!id) {
       setLoading(false);
-    };
-    fetchRequest();
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'requests', id),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setRequest({ ...docSnap.data(), id: docSnap.id } as ClinicalRequest);
+        } else {
+          setRequest(null);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Print request sync error:', error);
+        setLoading(false);
+      },
+    );
+
+    return unsubscribe;
   }, [id]);
 
   const handlePrint = () => {
