@@ -27,6 +27,7 @@ export default function NewRequestPage() {
   const requiresDiagnosisDescription =
     requiresStructuredFields && formData.requestedAction !== 'კვლევა';
   const automaticSenderName = profile?.fullName?.trim() || profile?.email?.split('@')[0] || 'ემერჯენსი';
+  const resolvedSenderName = formData.senderName.trim() || automaticSenderName;
   
   const [deptSearch, setDeptSearch] = useState('');
   const [showDeptList, setShowDeptList] = useState(false);
@@ -283,8 +284,9 @@ export default function NewRequestPage() {
           address: formData.address,
         },
         createdByUserId: profile.uid,
-        createdByUserName: formData.senderName.trim() || automaticSenderName,
+        createdByUserName: resolvedSenderName,
         createdByUserEmail: profile.email,
+        formFillerName: resolvedSenderName,
         requestedAction: formData.requestedAction,
         department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
         studyType: formData.studyType,

@@ -58,6 +58,16 @@ function getDateTimeLabel(value: any) {
     : '-';
 }
 
+function getDefaultFormFillerName(request?: ClinicalRequest | null, fallbackName?: string | null) {
+  const senderName = request?.createdByUserName?.trim();
+
+  if (senderName) {
+    return senderName;
+  }
+
+  return fallbackName?.trim() || '';
+}
+
 export default function RequestDetailsPage() {
   const { id } = useParams();
   const { profile, isRegistrar, isAdmin } = useAuth();
@@ -168,7 +178,7 @@ export default function RequestDetailsPage() {
             finalDecision: data.finalDecision || '',
             registrarComment: data.registrarComment || '',
             registrarName: data.registrarName || profile?.fullName || '',
-            formFillerName: data.formFillerName || profile?.fullName || '',
+            formFillerName: data.formFillerName || getDefaultFormFillerName(data, profile?.fullName) || '',
           }));
         }
 
@@ -191,9 +201,9 @@ export default function RequestDetailsPage() {
     setFormData((current) => ({
       ...current,
       registrarName: current.registrarName || profile.fullName,
-      formFillerName: current.formFillerName || profile.fullName,
+      formFillerName: current.formFillerName || getDefaultFormFillerName(request, profile.fullName),
     }));
-  }, [isAdmin, isRegistrar, profile]);
+  }, [isAdmin, isRegistrar, profile, request]);
 
   const statusOptions = Array.from(
     new Set([
@@ -274,7 +284,7 @@ export default function RequestDetailsPage() {
         finalDecision: formData.finalDecision,
         registrarComment: formData.registrarComment.trim(),
         registrarName: formData.registrarName,
-        formFillerName: formData.formFillerName,
+        formFillerName: formData.formFillerName.trim() || getDefaultFormFillerName(request, profile.fullName),
         updatedAt: Timestamp.now(),
       };
 

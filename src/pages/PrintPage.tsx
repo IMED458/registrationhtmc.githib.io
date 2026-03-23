@@ -9,6 +9,16 @@ import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 import { Printer, ArrowLeft, Loader2 } from 'lucide-react';
 
+function getResolvedFormFillerName(request: ClinicalRequest) {
+  const formFillerName = request.formFillerName?.trim();
+
+  if (formFillerName) {
+    return formFillerName;
+  }
+
+  return request.createdByUserName?.trim() || '';
+}
+
 export default function PrintPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -46,6 +56,8 @@ export default function PrintPage() {
 
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
   if (!request) return <div className="text-center p-12 text-slate-500">მოთხოვნა ვერ მოიძებნა</div>;
+
+  const resolvedFormFillerName = getResolvedFormFillerName(request);
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 sm:p-8 print:bg-white print:p-0">
@@ -145,11 +157,11 @@ export default function PrintPage() {
                 </div>
               </div>
             )}
-            {request.formFillerName && (
+            {resolvedFormFillerName && (
               <div>
                 <div className="text-[10px] font-black uppercase text-slate-500">ფურცლის შემვსები</div>
                 <div className="text-sm font-bold border-b border-slate-300 pb-1">
-                  {request.formFillerName}
+                  {resolvedFormFillerName}
                 </div>
               </div>
             )}
