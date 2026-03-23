@@ -71,14 +71,22 @@ service cloud.firestore {
 
     function registrarDirectEditPayloadIsValid() {
       return request.resource.data.registrarComment is string &&
-        request.resource.data.registrarComment.size() > 0 &&
+        (
+          !('lastRegistrarEditAt' in resource.data) ||
+          resource.data.lastRegistrarEditAt == null ||
+          request.resource.data.registrarComment.size() > 0
+        ) &&
         request.resource.data.lastRegistrarEditByUserId == request.auth.uid &&
         request.resource.data.lastRegistrarEditByUserEmail == userEmail() &&
         request.resource.data.adminConfirmationStatus == "pending" &&
         request.resource.data.pendingRegistrarUpdate != null &&
         request.resource.data.pendingRegistrarUpdate.currentStatus != null &&
         request.resource.data.pendingRegistrarUpdate.registrarComment is string &&
-        request.resource.data.pendingRegistrarUpdate.registrarComment.size() > 0 &&
+        (
+          !('lastRegistrarEditAt' in resource.data) ||
+          resource.data.lastRegistrarEditAt == null ||
+          request.resource.data.pendingRegistrarUpdate.registrarComment.size() > 0
+        ) &&
         request.resource.data.pendingRegistrarUpdate.requestedByUserId == request.auth.uid &&
         request.resource.data.pendingRegistrarUpdate.requestedByUserEmail == userEmail();
     }

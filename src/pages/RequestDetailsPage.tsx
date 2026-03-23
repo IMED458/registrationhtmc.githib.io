@@ -184,6 +184,7 @@ export default function RequestDetailsPage() {
     (request.createdByUserId === profile.uid || request.createdByUserEmail === profile.email);
   const canDoctorEdit = isDoctorOrNurse && isRequestOwner && !isAdmin && !isRegistrar;
   const canManageRequest = isRegistrar || isAdmin || canDoctorEdit;
+  const requiresRegistrarComment = isRegistrarOnly && Boolean(request?.lastRegistrarEditAt);
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
     : null;
@@ -409,7 +410,7 @@ export default function RequestDetailsPage() {
       return;
     }
 
-    if (isRegistrarOnly && !formData.registrarComment.trim()) {
+    if (requiresRegistrarComment && !formData.registrarComment.trim()) {
       setFormError('რეგისტრატორის ცვლილების შესანახად კომენტარი სავალდებულოა.');
       return;
     }
@@ -533,7 +534,9 @@ export default function RequestDetailsPage() {
           requestId: id,
           actionType: 'REGISTRAR_EDIT',
           oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-          newValue: `${getUpdateSummary(formData.currentStatus, formData.finalDecision)} / კომენტარი: ${formData.registrarComment.trim()}`,
+          newValue: formData.registrarComment.trim()
+            ? `${getUpdateSummary(formData.currentStatus, formData.finalDecision)} / კომენტარი: ${formData.registrarComment.trim()}`
+            : getUpdateSummary(formData.currentStatus, formData.finalDecision),
         });
 
         setConfirmAction(null);
@@ -954,7 +957,9 @@ export default function RequestDetailsPage() {
               <form onSubmit={handleUpdate} className="space-y-4 p-4 sm:p-6">
                 {isRegistrarOnly && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                    ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.
+                    {requiresRegistrarComment
+                      ? 'ცვლილება მაშინვე შეინახება, ექიმთანაც დაუყოვნებლივ დასინქრონდება, ხოლო კომენტარი სავალდებულოა. პარალელურად ადმინთან გაიგზავნება დადასტურების შეტყობინება.'
+                      : 'პირველი მოქმედებისას კომენტარი არჩევითია. შემდეგი რედაქტირებიდან კომენტარი უკვე სავალდებულო გახდება.'}
                   </div>
                 )}
 
@@ -1192,7 +1197,11 @@ export default function RequestDetailsPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-700">
                         რეგისტრატორის კომენტარი
-                        {isRegistrarOnly && <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>}
+                        {requiresRegistrarComment ? (
+                          <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>
+                        ) : (
+                          <span className="ml-2 text-xs text-slate-400">(პირველი მოქმედებისთვის არჩევითი)</span>
+                        )}
                       </label>
                       <textarea
                         rows={3}
