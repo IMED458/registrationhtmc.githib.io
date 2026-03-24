@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { Link } from 'react-router-dom';
+import { collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
-import { Archive, CalendarDays, Clock3, Search } from 'lucide-react';
+import { Archive, CalendarDays, Clock3, Pencil, Search, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
+import { useAuth } from '../AuthContext';
+import { writeAuditLogEntry } from '../auditLog';
+import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { ClinicalRequest } from '../types';
 import {
   ARCHIVE_RETENTION_MS,
@@ -30,9 +33,12 @@ function sortArchivedRequests(requests: ClinicalRequest[]) {
 }
 
 export default function ArchivePage() {
+  const { profile, isAdmin, isDoctorOrNurse } = useAuth();
+  const navigate = useNavigate();
   const [archivedRequests, setArchivedRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingRequestId, setDeletingRequestId] = useState('');
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -56,6 +62,62 @@ export default function ArchivePage() {
   }, []);
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
+
+  const canEditRequest = (request: ClinicalRequest) => {
+    if (isAdmin) {
+      return true;
+    }
+
+    if (!isDoctorOrNurse || !profile) {
+      return false;
+    }
+
+    return request.createdByUserId === profile.uid || request.createdByUserEmail === profile.email;
+  };
+
+  const handleEditRequest = (requestId: string) => {
+    navigate(`/request/${requestId}`, { state: { startEditing: true } });
+  };
+
+  const handleDeleteRequest = async (request: ClinicalRequest) => {
+    if (!isAdmin || !profile || deletingRequestId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `ნამდვილად გსურთ არქივიდან "${request.patientData.firstName} ${request.patientData.lastName}" ჩანაწერის წაშლა?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingRequestId(request.id);
+
+    try {
+      await deleteDoc(doc(db, 'requests', request.id));
+
+      await writeAuditLogEntry({
+        userId: profile.uid,
+        userName: profile.fullName,
+        requestId: request.id,
+        actionType: 'DELETE',
+        oldValue: `არქივი / ${request.currentStatus}${request.finalDecision ? ` / ${request.finalDecision}` : ''}`,
+        newValue: `არქივიდან წაიშალა მოთხოვნა: ${request.patientData.firstName} ${request.patientData.lastName}`,
+      });
+    } catch (error) {
+      console.error('Archive delete error:', error);
+      alert(
+        getFirebaseActionErrorMessage(error, {
+          fallback: 'არქივიდან ჩანაწერის წაშლა ვერ მოხერხდა.',
+          permissionDenied:
+            'არქივიდან წაშლა ვერ მოხერხდა, რადგან ამ ანგარიშისთვის delete წვდომა არ არის ნებადართული.',
+        }),
+      );
+    } finally {
+      setDeletingRequestId('');
+    }
+  };
 
   const filteredRequests = archivedRequests.filter((request) => {
     if (!normalizedSearch) {
@@ -107,7 +169,7 @@ export default function ArchivePage() {
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="ძებნა არქივში"
+            placeholder="ძებნა: სახელი, გვარი, ისტორიის ნომერი, დიაგნოზი"
             className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
           />
         </div>
@@ -174,12 +236,35 @@ export default function ArchivePage() {
                             </div>
                           </div>
 
-                          <Link
-                            to={`/request/${request.id}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            დეტალები
-                          </Link>
+                          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:min-w-[180px]">
+                            <Link
+                              to={`/request/${request.id}`}
+                              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                            >
+                              დეტალები
+                            </Link>
+                            {canEditRequest(request) && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditRequest(request.id)}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 transition hover:bg-sky-100"
+                              >
+                                <Pencil className="h-4 w-4" />
+                                რედაქტირება
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRequest(request)}
+                                disabled={deletingRequestId === request.id}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                {deletingRequestId === request.id ? 'იშლება...' : 'წაშლა'}
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="mt-5 grid grid-cols-1 gap-4 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">

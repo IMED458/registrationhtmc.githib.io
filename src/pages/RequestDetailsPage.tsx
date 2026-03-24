@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
@@ -210,6 +210,7 @@ function buildFormDataFromRequest(
 export default function RequestDetailsPage() {
   const { id } = useParams();
   const { profile, isRegistrar, isAdmin, isDoctorOrNurse } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [request, setRequest] = useState<ClinicalRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -219,6 +220,7 @@ export default function RequestDetailsPage() {
   const [syncNoticeMessage, setSyncNoticeMessage] = useState('');
   const [formError, setFormError] = useState('');
   const autoStatusSyncRef = useRef(false);
+  const autoEditTriggeredRef = useRef(false);
 
   const [formData, setFormData] = useState<RequestEditFormState>(() => buildFormDataFromRequest(null));
 
@@ -232,6 +234,7 @@ export default function RequestDetailsPage() {
   const showManagementPanel = isRegistrarOnly || isAdmin;
   const isDoctorInlineEditing = canDoctorEdit && isEditing;
   const requiresRegistrarComment = isRegistrarOnly && Boolean(request?.lastRegistrarEditAt);
+  const shouldStartInEditMode = Boolean((location.state as { startEditing?: boolean } | null)?.startEditing);
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
     : null;
@@ -338,6 +341,18 @@ export default function RequestDetailsPage() {
       formFillerName: current.formFillerName || getDefaultFormFillerName(request, profile.fullName),
     }));
   }, [isAdmin, isRegistrar, profile, request]);
+
+  useEffect(() => {
+    if (!shouldStartInEditMode || autoEditTriggeredRef.current || !request || isEditing || !canOpenFullEdit) {
+      return;
+    }
+
+    autoEditTriggeredRef.current = true;
+    setFormError('');
+    setSyncNoticeMessage('');
+    setFormData(buildFormDataFromRequest(request, profile?.fullName));
+    setIsEditing(true);
+  }, [canOpenFullEdit, isEditing, profile?.fullName, request, shouldStartInEditMode]);
 
   const statusOptions = Array.from(
     new Set([
