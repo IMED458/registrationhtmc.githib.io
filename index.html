@@ -3,9 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="%BASE_URL%clinic-transfer-logo.svg" />
-    <link rel="apple-touch-icon" href="%BASE_URL%clinic-transfer-logo.svg" />
+    <meta name="theme-color" content="#f8fafc" />
     <title>კლინიკის გადამისამართების სისტემა</title>
+    <script type="module">
+      const basePath = window.location.hostname.endsWith('github.io')
+        ? '/registrationhtmc.githib.io/docs/'
+        : '/';
+      const version = '20260324c';
+      const iconDefinitions = [
+        { rel: 'icon', type: 'image/png', sizes: '32x32', href: `${basePath}favicon-32x32.png?v=${version}` },
+        { rel: 'icon', type: 'image/png', sizes: '16x16', href: `${basePath}favicon-16x16.png?v=${version}` },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: `${basePath}apple-touch-icon.png?v=${version}` },
+      ];
+
+      iconDefinitions.forEach((definition) => {
+        const link = document.createElement('link');
+        link.rel = definition.rel;
+        link.href = definition.href;
+
+        if (definition.type) {
+          link.type = definition.type;
+        }
+
+        if (definition.sizes) {
+          link.sizes = definition.sizes;
+        }
+
+        document.head.appendChild(link);
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
