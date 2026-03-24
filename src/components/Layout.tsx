@@ -14,7 +14,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
-  const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324c`;
+  const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324d`;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -106,7 +106,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <img
                 src={appLogoUrl}
                 alt="კლინიკის ლოგო"
-                className="h-11 w-11 rounded-2xl object-cover shadow-sm"
+                className="h-12 w-12 object-contain"
               />
               <h1 className="hidden text-xl font-bold text-slate-900 sm:block">
                 კლინიკის მართვის სისტემა
