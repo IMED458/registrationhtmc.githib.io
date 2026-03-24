@@ -1,43 +1,49 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="folderBack" x1="129" y1="91" x2="175" y2="395" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#83C7FF"/>
-      <stop offset="1" stop-color="#287AEC"/>
+    <linearGradient id="panelBg" x1="256" y1="24" x2="256" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EDF6FF"/>
     </linearGradient>
-    <linearGradient id="folderFront" x1="123" y1="144" x2="425" y2="411" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#EAF6FF"/>
-      <stop offset="0.58" stop-color="#86BFF8"/>
-      <stop offset="1" stop-color="#1D71E8"/>
+    <linearGradient id="cardBlue" x1="70" y1="98" x2="189" y2="441" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#84C8FF"/>
+      <stop offset="1" stop-color="#2D7EEB"/>
     </linearGradient>
-    <linearGradient id="arrowFill" x1="314" y1="214" x2="475" y2="214" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#9FD2FF"/>
-      <stop offset="0.56" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#3791F4"/>
+    <linearGradient id="ringBlue" x1="107" y1="115" x2="406" y2="412" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8F1FF"/>
+      <stop offset="0.48" stop-color="#7BC2F7"/>
+      <stop offset="1" stop-color="#2E83EE"/>
     </linearGradient>
-    <filter id="softShadow" x="67" y="61" width="418" height="361" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <linearGradient id="personBlue" x1="256" y1="193" x2="256" y2="383" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2D87EF"/>
+      <stop offset="1" stop-color="#124DAD"/>
+    </linearGradient>
+    <filter id="iconShadow" x="0" y="8" width="512" height="504" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="BackgroundImageFix"/>
       <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-      <feOffset dy="10"/>
-      <feGaussianBlur stdDeviation="12"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0.176471 0 0 0 0 0.47451 0 0 0 0 0.909804 0 0 0 0.22 0"/>
+      <feOffset dy="12"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.345098 0 0 0 0 0.603922 0 0 0 0 0.909804 0 0 0 0.2 0"/>
       <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
       <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
     </filter>
   </defs>
 
-  <g filter="url(#softShadow)">
-    <path d="M121 122C121 108.193 132.193 97 146 97H216.625C228.131 97 238.673 103.287 244.051 113.368L250.086 124.68C254.423 132.807 262.877 137.883 272.089 137.883H381C394.807 137.883 406 149.076 406 162.883V190H121V122Z" fill="url(#folderBack)"/>
-    <rect x="121" y="144" width="306" height="236" rx="38" fill="url(#folderFront)"/>
-    <rect x="139" y="163" width="272" height="198" rx="30" fill="url(#folderFront)" opacity="0.95"/>
+  <g filter="url(#iconShadow)">
+    <rect x="24" y="24" width="464" height="464" rx="72" fill="url(#panelBg)"/>
   </g>
 
-  <rect x="173" y="187" width="36" height="108" rx="7" fill="#F54E4E"/>
-  <rect x="137" y="223" width="108" height="36" rx="7" fill="#F54E4E"/>
+  <path d="M67 122C67 107.641 78.6406 96 93 96H195.994C207.174 96 217.451 102.04 223.02 111.799L233.126 129.511C237.746 137.611 246.355 142.628 255.681 142.628H393C407.359 142.628 419 154.269 419 168.628V402C419 416.359 407.359 428 393 428H93C78.6406 428 67 416.359 67 402V122Z" fill="url(#cardBlue)"/>
 
-  <circle cx="298" cy="219" r="53" fill="#FBFDFF"/>
-  <rect x="245" y="264" width="106" height="53" rx="18" fill="#FBFDFF"/>
-  <path d="M200 383C209.712 311.277 270.982 257 345.5 257C420.018 257 481.288 311.277 491 383H200Z" fill="#FBFDFF" transform="translate(-19 0)"/>
+  <rect x="363" y="76" width="24" height="92" rx="6" fill="#CF2345"/>
+  <rect x="329" y="110" width="92" height="24" rx="6" fill="#CF2345"/>
 
-  <path d="M325 197H406V176L475 232L406 288V267H325V197Z" fill="url(#arrowFill)"/>
-  <path d="M344 288H423V267L487 320L423 373V352H344V288Z" fill="url(#arrowFill)"/>
+  <path d="M115 256C115 177.608 178.608 114 257 114C335.392 114 399 177.608 399 256C399 334.392 335.392 398 257 398C178.608 398 115 334.392 115 256Z" fill="white"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M100 252C100 166.948 168.948 98 254 98C294.954 98 334.603 114.12 364.002 143.594L380.969 126.884C383.64 124.254 388.151 126.146 388.151 129.894V206.004C388.151 208.212 386.361 210.002 384.153 210.002H307.647C304.034 210.002 302.123 205.662 304.597 203.028L323.278 183.138C304.798 164.111 280.11 153.5 254 153.5C198.367 153.5 153.25 198.617 153.25 254.25C153.25 277.14 160.9 298.244 174.042 315.14L143.714 338.404C115.95 314.275 100 284.064 100 252ZM208.103 384.829C222.551 390.866 238.086 394 254.352 394C339.404 394 408.352 325.052 408.352 240C408.352 216.452 403.069 194.138 393.635 174.179L361.92 196.887C367.768 210.192 371 224.899 371 240.361C371 295.994 325.883 341.111 270.25 341.111C244.521 341.111 221.045 331.46 203.25 315.592L221.88 296.426C224.419 293.813 222.567 289.422 218.923 289.422H142.818C140.61 289.422 138.82 291.212 138.82 293.42V370.326C138.82 373.987 143.285 375.826 145.879 373.244L165.388 353.82C177.416 367.297 191.856 377.626 208.103 384.829Z" fill="url(#ringBlue)"/>
+
+  <circle cx="257" cy="214" r="31" fill="url(#personBlue)"/>
+  <path d="M201.34 397C205.602 332.473 223.89 277 257 277C290.11 277 308.398 332.473 312.66 397H201.34Z" fill="url(#personBlue)"/>
+  <rect x="224" y="262" width="25" height="104" rx="12.5" fill="url(#personBlue)"/>
+  <rect x="265" y="262" width="25" height="104" rx="12.5" fill="url(#personBlue)"/>
+  <rect x="196.402" y="273.34" width="23" height="87" rx="11.5" transform="rotate(13 196.402 273.34)" fill="url(#personBlue)"/>
+  <rect x="294.016" y="278.516" width="23" height="87" rx="11.5" transform="rotate(-13 294.016 278.516)" fill="url(#personBlue)"/>
 </svg>
