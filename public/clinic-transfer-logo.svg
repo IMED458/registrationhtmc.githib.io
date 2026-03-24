@@ -1,0 +1,49 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E6F1FF"/>
+    </linearGradient>
+    <linearGradient id="folderBack" x1="170" y1="120" x2="198" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7CC0FF"/>
+      <stop offset="1" stop-color="#2D7BEA"/>
+    </linearGradient>
+    <linearGradient id="folderFront" x1="170" y1="160" x2="364" y2="398" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF5FF"/>
+      <stop offset="0.55" stop-color="#83BDF7"/>
+      <stop offset="1" stop-color="#1D71E8"/>
+    </linearGradient>
+    <linearGradient id="arrowBlue" x1="318" y1="218" x2="431" y2="218" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9FD2FF"/>
+      <stop offset="0.5" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#3791F4"/>
+    </linearGradient>
+    <filter id="shadow" x="64" y="48" width="384" height="416" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="12"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.454902 0 0 0 0 0.627451 0 0 0 0 0.862745 0 0 0 0.22 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="96" y="64" width="320" height="384" rx="56" fill="url(#bg)"/>
+  </g>
+
+  <path d="M176 136C176 124.954 184.954 116 196 116H246.5C255.522 116 263.828 120.835 268.265 128.667L272.735 136.553C276.285 142.818 282.929 146.695 290.13 146.695H364C375.046 146.695 384 155.649 384 166.695V184H176V136Z" fill="url(#folderBack)"/>
+  <rect x="176" y="156" width="272" height="214" rx="32" fill="url(#folderFront)"/>
+  <rect x="192" y="172" width="240" height="182" rx="26" fill="url(#folderFront)" opacity="0.92"/>
+
+  <rect x="208" y="194" width="28" height="84" rx="6" fill="#F54E4E"/>
+  <rect x="180" y="222" width="84" height="28" rx="6" fill="#F54E4E"/>
+
+  <path d="M238 364C244.959 310.862 292.515 270 349 270C405.485 270 453.041 310.862 460 364H238Z" fill="#FBFDFF" transform="translate(-22 0)"/>
+  <circle cx="327" cy="226" r="42" fill="#FBFDFF" transform="translate(-22 0)"/>
+  <rect x="269" y="248" width="72" height="46" rx="16" fill="#FBFDFF" transform="translate(-22 0)"/>
+
+  <path d="M322 210H392L392 192L431 226L392 260V242H322V210Z" fill="url(#arrowBlue)"/>
+  <path d="M336 276H404V258L443 292L404 326V308H336V276Z" fill="url(#arrowBlue)"/>
+</svg>

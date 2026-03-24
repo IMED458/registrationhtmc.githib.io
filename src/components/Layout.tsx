@@ -13,6 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, isDoctorOrNurse } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.svg`;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -99,9 +100,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
-              <div className="bg-emerald-600 p-2 rounded-lg">
-                <ClipboardList className="text-white w-6 h-6" />
-              </div>
+              <img
+                src={appLogoUrl}
+                alt="კლინიკის ლოგო"
+                className="h-11 w-11 rounded-2xl object-cover shadow-sm"
+              />
               <h1 className="hidden text-xl font-bold text-slate-900 sm:block">
                 კლინიკის მართვის სისტემა
               </h1>
