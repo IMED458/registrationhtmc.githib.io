@@ -8,6 +8,7 @@ import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { getDiagnosisEntries, getDiagnosisSearchText, normalizeIcdCode } from '../icd10Utils';
 import { getStudyTypeSummary } from '../studyTypeUtils';
+import { isArchivedRequest } from '../archiveUtils';
 import { ClinicalRequest, RequestStatus } from '../types';
 import { REQUEST_STATUSES } from '../constants';
 import { CheckCircle2, Clock, Filter, Loader2, MoreHorizontal, Plus, Printer, Search, Trash2, XCircle } from 'lucide-react';
@@ -152,7 +153,9 @@ export default function Dashboard() {
     const unsubscribe = onSnapshot(
       collection(db, 'requests'),
       (snapshot) => {
-        const docs = snapshot.docs.map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest));
+        const docs = snapshot.docs
+          .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
+          .filter((request) => !isArchivedRequest(request));
         setRequests(sortRequestsByCreatedAt(docs));
         setRequestsError('');
         setLoading(false);

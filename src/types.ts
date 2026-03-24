@@ -82,6 +82,7 @@ export interface ClinicalRequest {
   lastDoctorEditByUserName?: string;
   lastDoctorEditByUserEmail?: string;
   lastDoctorEditComment?: string;
+  archivedAt?: any;
   currentStatus: RequestStatus;
   createdAt: any;
   updatedAt: any;

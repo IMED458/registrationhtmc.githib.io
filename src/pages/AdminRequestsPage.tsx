@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
+import { isArchivedRequest } from '../archiveUtils';
 import { ClinicalRequest } from '../types';
 import { CheckCircle2, Loader2, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
@@ -29,6 +30,7 @@ export default function AdminRequestsPage() {
         const nextRequests = snapshot.docs
           .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
           .filter((request) => (
+            !isArchivedRequest(request) &&
             request.adminConfirmationStatus === 'pending' &&
             (request.pendingRegistrarUpdate || request.pendingDoctorEdit)
           ));

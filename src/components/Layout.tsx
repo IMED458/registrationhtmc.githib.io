@@ -4,7 +4,8 @@ import { getRoleLabel } from '../accessControl';
 import { useAuth } from '../AuthContext';
 import { auth, db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
+import { useArchiveMaintenance } from '../useArchiveMaintenance';
+import { Archive, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
 import { ClinicalRequest } from '../types';
 
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
@@ -21,6 +22,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
   });
+
+  useArchiveMaintenance(Boolean(profile));
 
   useEffect(() => {
     if (!isAdmin || !db) {
@@ -186,6 +189,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </NavLink>
             )}
 
+            <NavLink
+              to="/archive"
+              className={navItemClassName}
+              title="არქივი"
+            >
+              <Archive className="w-5 h-5 text-slate-400" />
+              {!isSidebarCollapsed && 'არქივი'}
+            </NavLink>
+
             {isAdmin && (
               <NavLink
                 to="/admin-requests"
@@ -228,7 +240,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
-        <div className={`grid gap-2 ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={`grid gap-2 ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
           <NavLink to="/" className={mobileNavItemClassName}>
             <LayoutDashboard className="h-5 w-5" />
             <span className="text-xs">მთავარი</span>
@@ -244,6 +256,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               მოთხოვნა
             </div>
           )}
+
+          <NavLink to="/archive" className={mobileNavItemClassName}>
+            <Archive className="h-5 w-5" />
+            <span className="text-xs">არქივი</span>
+          </NavLink>
 
           {isAdmin ? (
             <NavLink to="/admin-requests" className={mobileNavItemClassName}>
@@ -264,11 +281,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Settings className="h-5 w-5" />
               <span className="text-xs">ადმინი</span>
             </NavLink>
-          ) : (
-            <div className="rounded-xl px-2 py-2 text-center text-xs font-medium text-slate-300">
-              პარამეტრები
-            </div>
-          )}
+          ) : null}
         </div>
       </nav>
     </div>

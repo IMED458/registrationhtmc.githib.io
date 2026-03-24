@@ -8,6 +8,7 @@ import RequestDetailsPage from './pages/RequestDetailsPage';
 import PrintPage from './pages/PrintPage';
 import AdminSettingsPage from './pages/AdminSettingsPage';
 import AdminRequestsPage from './pages/AdminRequestsPage';
+import ArchivePage from './pages/ArchivePage';
 import FirebaseSetupPage from './pages/FirebaseSetupPage';
 import { isFirebaseConfigured } from './firebase';
 
@@ -82,6 +83,12 @@ export default function App() {
           <Route path="/admin-requests" element={
             <ProtectedRoute>
               <AdminRequestsPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/archive" element={
+            <ProtectedRoute>
+              <ArchivePage />
             </ProtectedRoute>
           } />
 
