@@ -5,13 +5,14 @@ import { useAuth } from '../AuthContext';
 import { auth, db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useArchiveMaintenance } from '../useArchiveMaintenance';
-import { Archive, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
+import { useRequestNotifications } from '../useRequestNotifications';
+import { Archive, BellRing, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
 import { ClinicalRequest } from '../types';
 
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, isDoctorOrNurse } = useAuth();
+  const { profile, isAdmin, isDoctorOrNurse, isRegistrar } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
@@ -24,6 +25,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
 
   useArchiveMaintenance(Boolean(profile));
+
+  const {
+    notificationPermission,
+    requestNotificationPermission,
+    supportsNotifications,
+  } = useRequestNotifications({
+    profile,
+    isAdmin,
+    isRegistrar,
+  });
+
+  const shouldShowNotificationButton =
+    supportsNotifications &&
+    (isAdmin || isRegistrar) &&
+    notificationPermission !== 'granted';
 
   useEffect(() => {
     if (!isAdmin || !db) {
@@ -117,6 +133,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
+              {shouldShowNotificationButton && (
+                <button
+                  type="button"
+                  onClick={requestNotificationPermission}
+                  className="hidden items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 lg:inline-flex"
+                  title="ბრაუზერის შეტყობინებების ჩართვა"
+                >
+                  <BellRing className="h-4 w-4" />
+                  {notificationPermission === 'denied'
+                    ? 'შეტყობინებები ბრაუზერში ჩართე'
+                    : 'შეტყობინებების ჩართვა'}
+                </button>
+              )}
               <div className="flex max-w-[13rem] items-center gap-2 rounded-full bg-slate-100 px-3 py-1 sm:max-w-none">
                 <User className="h-4 w-4 flex-shrink-0 text-slate-500" />
                 <div className="min-w-0">
