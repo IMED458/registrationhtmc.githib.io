@@ -18,7 +18,7 @@ function mergeSystemSettings(input?: Partial<SystemSettings> | null): SystemSett
 }
 
 export default function AdminSettingsPage() {
-  const { canAccessAdminPanel, canApproveAdminChanges, profile } = useAuth();
+  const { canAccessAdminPanel, canApproveAdminChanges, canEditAdminContent, profile } = useAuth();
   const navigate = useNavigate();
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -64,6 +64,11 @@ export default function AdminSettingsPage() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canEditAdminContent) {
+      return;
+    }
+
     setSaving(true);
     try {
       await setDoc(doc(db, 'settings', 'global'), settings);
@@ -95,7 +100,7 @@ export default function AdminSettingsPage() {
   };
 
   const handleToggleRegistrar = async () => {
-    if (!profile) {
+    if (!profile || !canEditAdminContent) {
       return;
     }
 
@@ -208,6 +213,11 @@ export default function AdminSettingsPage() {
             ამ ანგარიშს რედაქტირებების დადასტურების უფლება არ აქვს.
           </p>
         )}
+        {!canEditAdminContent && (
+          <p className="mt-2 text-sm font-bold text-slate-500">
+            ამ ანგარიშს პარამეტრების შეცვლის უფლება არ აქვს და გვერდი მხოლოდ ნახვის რეჟიმშია.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -223,6 +233,7 @@ export default function AdminSettingsPage() {
                 <label className="text-sm font-bold text-slate-700">Google Sheets ბმული ან ID</label>
                 <input
                   type="text"
+                  disabled={!canEditAdminContent}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={settings.googleSheetsId}
                   onChange={(e) => setSettings({ ...settings, googleSheetsId: e.target.value })}
@@ -235,6 +246,7 @@ export default function AdminSettingsPage() {
                 <label className="text-sm font-bold text-slate-700">Sheet-ის სახელი</label>
                 <input
                   type="text"
+                  disabled={!canEditAdminContent}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={settings.sheetName}
                   onChange={(e) => setSettings({ ...settings, sheetName: e.target.value })}
@@ -247,6 +259,7 @@ export default function AdminSettingsPage() {
                 <label className="text-sm font-bold text-slate-700">Sheet GID</label>
                 <input
                   type="text"
+                  disabled={!canEditAdminContent}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={settings.sheetGid || ''}
                   onChange={(e) => setSettings({ ...settings, sheetGid: e.target.value })}
@@ -261,6 +274,7 @@ export default function AdminSettingsPage() {
                       <span className="w-full flex-shrink-0 text-sm text-slate-600 sm:w-32">{key}</span>
                       <input
                         type="text"
+                        disabled={!canEditAdminContent}
                         className="flex-1 px-4 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                         value={(settings.columnMapping as any)[key]}
                         onChange={(e) => setSettings({
@@ -275,11 +289,11 @@ export default function AdminSettingsPage() {
 
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || !canEditAdminContent}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : success ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
-                {success ? 'შენახულია' : 'პარამეტრების შენახვა'}
+                {success ? 'შენახულია' : canEditAdminContent ? 'პარამეტრების შენახვა' : 'მხოლოდ ნახვა'}
               </button>
             </form>
           </div>
@@ -303,7 +317,7 @@ export default function AdminSettingsPage() {
                   <button
                     type="button"
                     onClick={handleToggleRegistrar}
-                    disabled={registrarSaving}
+                    disabled={registrarSaving || !canEditAdminContent}
                     className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 font-bold text-white transition disabled:opacity-50 sm:w-auto ${
                       isRegistrarDeleted
                         ? 'bg-emerald-600 hover:bg-emerald-700'
@@ -317,7 +331,9 @@ export default function AdminSettingsPage() {
                     ) : (
                       <Trash2 className="w-4 h-4" />
                     )}
-                    {isRegistrarDeleted ? 'რეგისტრატორის აღდგენა' : 'რეგისტრატორის წაშლა'}
+                    {canEditAdminContent
+                      ? (isRegistrarDeleted ? 'რეგისტრატორის აღდგენა' : 'რეგისტრატორის წაშლა')
+                      : 'მხოლოდ ნახვა'}
                   </button>
                 </div>
               </div>

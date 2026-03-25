@@ -20,8 +20,28 @@ service cloud.firestore {
       );
     }
 
+    function isReadOnlyAdmin() {
+      return isSignedIn() &&
+        userEmail() == "nino.nikaberidze@gmail.com";
+    }
+
+    function canWriteData() {
+      return isSignedIn() && (
+        userEmail() == "imedashviligio27@gmail.com" ||
+        userEmail() == "eringorokva@gmail.com" ||
+        userEmail() == "emergencyhtmc14@gmail.com"
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser() && request.auth.uid == userId;
+      allow delete: if canWriteData() && !isReadOnlyAdmin();
+    }
+
     match /{document=**} {
-      allow read, write: if isAllowedUser();
+      allow read: if isAllowedUser();
+      allow write: if canWriteData();
     }
   }
 }

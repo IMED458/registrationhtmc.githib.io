@@ -12,7 +12,7 @@ import { ClinicalRequest } from '../types';
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
+  const { profile, isAdmin, canEditAdminContent, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
@@ -207,7 +207,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {!isSidebarCollapsed && 'მთავარი პანელი'}
             </NavLink>
             
-            {(isDoctorOrNurse || canAccessAdminPanel) && (
+            {(isDoctorOrNurse || canEditAdminContent) && (
               <NavLink
                 to="/new-request"
                 className={navItemClassName}
@@ -275,7 +275,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-xs">მთავარი</span>
           </NavLink>
 
-          {(isDoctorOrNurse || canAccessAdminPanel) ? (
+          {(isDoctorOrNurse || canEditAdminContent) ? (
             <NavLink to="/new-request" className={mobileNavItemClassName}>
               <FilePlus className="h-5 w-5" />
               <span className="text-xs">მოთხოვნა</span>
