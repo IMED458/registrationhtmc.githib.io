@@ -27,17 +27,25 @@ service cloud.firestore {
       );
     }
 
-    function isViewer() {
+    function isUser() {
       return isSignedIn() &&
         userEmail() == "nino.nikaberidze@gmail.com";
     }
 
     function isAllowedUser() {
-      return isAdmin() || isDoctor() || isRegistrar() || isViewer();
+      return isAdmin() || isDoctor() || isRegistrar() || isUser();
     }
 
-    function canWriteData() {
+    function canCreateRequests() {
+      return isAdmin() || isDoctor() || isUser();
+    }
+
+    function canUpdateRequests() {
       return isAdmin() || isDoctor() || isRegistrar();
+    }
+
+    function canCreateAuditLogs() {
+      return isAdmin() || isDoctor() || isRegistrar() || isUser();
     }
 
     match /users/{userId} {
@@ -48,12 +56,14 @@ service cloud.firestore {
 
     match /requests/{requestId} {
       allow read: if isAllowedUser();
-      allow write: if canWriteData();
+      allow create: if canCreateRequests();
+      allow update: if canUpdateRequests();
+      allow delete: if isAdmin();
     }
 
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if canWriteData();
+      allow create: if canCreateAuditLogs();
       allow update, delete: if isAdmin();
     }
 

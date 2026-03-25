@@ -12,7 +12,7 @@ import { ClinicalRequest } from '../types';
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, canEditAdminContent, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
+  const { profile, isAdmin, canCreateRequests, canAccessRequestsModule, canAccessAdminPanel, isRegistrar } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
@@ -207,7 +207,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {!isSidebarCollapsed && 'მთავარი პანელი'}
             </NavLink>
             
-            {(isDoctorOrNurse || canEditAdminContent) && (
+            {canCreateRequests && (
               <NavLink
                 to="/new-request"
                 className={navItemClassName}
@@ -227,7 +227,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {!isSidebarCollapsed && 'არქივი'}
             </NavLink>
 
-            {canAccessAdminPanel && (
+            {canAccessRequestsModule && (
               <NavLink
                 to="/admin-requests"
                 className={navItemClassName}
@@ -244,7 +244,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {!isSidebarCollapsed && (
                   <>
                     <span>მოთხოვნები</span>
-                    <span className="ml-auto">{pendingApprovalBadge}</span>
+                    <span className="ml-auto">{isAdmin ? pendingApprovalBadge : null}</span>
                   </>
                 )}
               </NavLink>
@@ -269,13 +269,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
-        <div className={`grid gap-2 ${canAccessAdminPanel ? 'grid-cols-5' : 'grid-cols-3'}`}>
+        <div
+          className={`grid gap-2 ${
+            canAccessAdminPanel
+              ? 'grid-cols-5'
+              : canAccessRequestsModule
+                ? 'grid-cols-4'
+                : 'grid-cols-3'
+          }`}
+        >
           <NavLink to="/" className={mobileNavItemClassName}>
             <LayoutDashboard className="h-5 w-5" />
             <span className="text-xs">მთავარი</span>
           </NavLink>
 
-          {(isDoctorOrNurse || canEditAdminContent) ? (
+          {canCreateRequests ? (
             <NavLink to="/new-request" className={mobileNavItemClassName}>
               <FilePlus className="h-5 w-5" />
               <span className="text-xs">მოთხოვნა</span>
@@ -291,11 +299,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-xs">არქივი</span>
           </NavLink>
 
-          {canAccessAdminPanel ? (
+          {canAccessRequestsModule ? (
             <NavLink to="/admin-requests" className={mobileNavItemClassName}>
               <div className="relative">
                 <ClipboardList className="h-5 w-5" />
-                {pendingApprovalBadge && (
+                {isAdmin && pendingApprovalBadge && (
                   <span className="absolute -right-2 -top-2">
                     {pendingApprovalBadge}
                   </span>

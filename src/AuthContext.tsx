@@ -13,6 +13,8 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   canEditAdminContent: boolean;
+  canCreateRequests: boolean;
+  canAccessRequestsModule: boolean;
   canAccessAdminPanel: boolean;
   canApproveAdminChanges: boolean;
   isDoctorOrNurse: boolean;
@@ -181,6 +183,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     isAdmin: profile?.role === 'admin',
     canEditAdminContent: profile?.role === 'admin',
+    canCreateRequests:
+      profile?.role === 'admin' ||
+      profile?.role === 'doctor' ||
+      profile?.role === 'nurse' ||
+      profile?.role === 'user',
+    canAccessRequestsModule: profile?.role === 'admin' || profile?.role === 'user',
     canAccessAdminPanel: profile?.role === 'admin',
     canApproveAdminChanges: profile?.role === 'admin',
     isDoctorOrNurse: profile?.role === 'doctor' || profile?.role === 'nurse',

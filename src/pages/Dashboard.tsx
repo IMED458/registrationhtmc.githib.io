@@ -187,7 +187,7 @@ function DiagnosisList({ request }: { request: ClinicalRequest }) {
 }
 
 export default function Dashboard() {
-  const { profile, isDoctorOrNurse, isAdmin, canEditAdminContent, isRegistrar } = useAuth();
+  const { profile, isAdmin, canCreateRequests, isRegistrar } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestsError, setRequestsError] = useState('');
@@ -375,7 +375,7 @@ export default function Dashboard() {
           <p className="text-slate-500">პაციენტების გადამისამართების მართვა</p>
         </div>
         
-        {(isDoctorOrNurse || canEditAdminContent) && (
+        {canCreateRequests && (
           <Link
             to="/new-request"
             className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-emerald-100"

@@ -61,14 +61,13 @@ function sanitizeDiagnoses(rows: DiagnosisFormRow[]): DiagnosisEntry[] {
 }
 
 export default function NewRequestPage() {
-  const { profile, canEditAdminContent, isDoctorOrNurse } = useAuth();
+  const { profile, canCreateRequests } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [lookupMessage, setLookupMessage] = useState('');
   const [patientLookupSource, setPatientLookupSource] = useState<'manual' | 'sheet'>('manual');
-  const canCreateRequests = canEditAdminContent || isDoctorOrNurse;
   const icdLookupRequestRef = useRef(0);
   const requiresStructuredFields = patientLookupSource === 'sheet';
   const automaticSenderName = resolveUserDisplayName(profile?.fullName, profile?.email) || 'ემერჯენსი';

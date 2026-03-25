@@ -13,14 +13,14 @@ import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 
 export default function AdminRequestsPage() {
-  const { canAccessAdminPanel, canApproveAdminChanges, profile } = useAuth();
+  const { canAccessRequestsModule, canApproveAdminChanges, profile } = useAuth();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingRequestId, setConfirmingRequestId] = useState('');
 
   useEffect(() => {
-    if (!canAccessAdminPanel) {
+    if (!canAccessRequestsModule) {
       setLoading(false);
       return;
     }
@@ -46,7 +46,7 @@ export default function AdminRequestsPage() {
     );
 
     return unsubscribe;
-  }, [canAccessAdminPanel]);
+  }, [canAccessRequestsModule]);
 
   const handleConfirmRequest = async (request: ClinicalRequest) => {
     if (!profile || confirmingRequestId || !canApproveAdminChanges) {
@@ -99,7 +99,7 @@ export default function AdminRequestsPage() {
     }
   };
 
-  if (!canAccessAdminPanel) {
+  if (!canAccessRequestsModule) {
     return <div className="text-center p-12 text-red-500 font-bold">წვდომა აკრძალულია</div>;
   }
 
