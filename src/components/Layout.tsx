@@ -138,7 +138,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={requestNotificationPermission}
-                  className="hidden items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 sm:inline-flex"
+                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] font-black text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 sm:text-xs"
                   title="ბრაუზერის შეტყობინებების ჩართვა"
                 >
                   <BellRing className="h-4 w-4" />

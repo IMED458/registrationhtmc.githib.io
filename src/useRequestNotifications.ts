@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { resolveUserDisplayName } from './accessControl';
 import { isArchivedRequest } from './archiveUtils';
 import { db } from './firebase';
+import { enablePushNotifications, supportsServiceWorkerNotifications, syncExistingPushNotifications } from './pushNotifications';
 import { normalizeRequestStatus, resolveRequestStatusFromRequest } from './requestStatusUtils';
 import { ClinicalRequest, UserProfile } from './types';
 
@@ -267,18 +268,29 @@ export function useRequestNotifications({
     return unsubscribe;
   }, [isAdmin, isDoctorOrNurse, isRegistrar, notificationPermission, profile]);
 
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    void syncExistingPushNotifications(profile);
+  }, [profile]);
+
   const requestNotificationPermission = async () => {
     if (!supportsBrowserNotifications()) {
       setNotificationPermission('unsupported');
       return 'unsupported';
     }
 
-    const permission = await window.Notification.requestPermission();
+    const result = await enablePushNotifications(profile);
+    const permission = result.permission;
     setNotificationPermission(permission);
 
     if (permission === 'granted') {
       const notification = new window.Notification('შეტყობინებები ჩართულია', {
-        body: 'ახლა ახალი მოთხოვნა, სტატუსის ცვლილება ან დასადასტურებელი ჩანაწერი ბრაუზერში შეგახსენდება.',
+        body: supportsServiceWorkerNotifications()
+          ? 'ახლა ახალი მოთხოვნა, სტატუსის ცვლილება ან დასადასტურებელი ჩანაწერი ბრაუზერში და ჰოუმ სქრინ აპშიც შეგახსენდება.'
+          : 'ახლა ახალი მოთხოვნა, სტატუსის ცვლილება ან დასადასტურებელი ჩანაწერი ბრაუზერში შეგახსენდება.',
         icon: NOTIFICATION_ICON_URL,
         badge: NOTIFICATION_ICON_URL,
         tag: 'notifications-enabled',

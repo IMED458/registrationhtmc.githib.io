@@ -6,6 +6,7 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   createdAt: string;
+  notificationTokens?: string[];
 }
 
 export interface Patient {

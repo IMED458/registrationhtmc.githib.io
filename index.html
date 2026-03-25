@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f8fafc" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="კლინიკა" />
     <title>კლინიკის გადამისამართების სისტემა</title>
     <script type="module">
       const basePath = window.location.hostname.endsWith('github.io')
@@ -31,6 +34,11 @@
 
         document.head.appendChild(link);
       });
+
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = `${basePath}manifest.webmanifest?v=${version}`;
+      document.head.appendChild(manifestLink);
     </script>
   </head>
   <body>
