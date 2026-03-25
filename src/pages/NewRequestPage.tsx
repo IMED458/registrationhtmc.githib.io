@@ -409,6 +409,18 @@ export default function NewRequestPage() {
     }
   };
 
+  const handleLookupKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!searching) {
+      void handleLookup();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
@@ -610,6 +622,7 @@ export default function NewRequestPage() {
                     className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={formData.historyNumber}
                     onChange={(e) => setFormData({ ...formData, historyNumber: e.target.value })}
+                    onKeyDown={handleLookupKeyDown}
                   />
                   <button
                     type="button"
@@ -630,6 +643,7 @@ export default function NewRequestPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.personalId}
                   onChange={(e) => setFormData({ ...formData, personalId: e.target.value })}
+                  onKeyDown={handleLookupKeyDown}
                 />
               </div>
             </div>
