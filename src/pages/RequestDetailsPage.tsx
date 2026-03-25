@@ -239,7 +239,6 @@ export default function RequestDetailsPage() {
   const canOpenFullEdit = canDoctorEdit || isAdmin;
   const showManagementPanel = isRegistrarOnly || isAdmin;
   const isDoctorInlineEditing = canDoctorEdit && isEditing;
-  const requiresRegistrarComment = isRegistrarOnly && Boolean(request?.lastRegistrarEditAt);
   const shouldStartInEditMode = Boolean((location.state as { startEditing?: boolean } | null)?.startEditing);
   const pendingUpdate = request?.adminConfirmationStatus === 'pending'
     ? request?.pendingRegistrarUpdate || null
@@ -455,11 +454,6 @@ export default function RequestDetailsPage() {
 
   const prepareUpdate = () => {
     if (!id || !profile || !request) {
-      return;
-    }
-
-    if (requiresRegistrarComment && !formData.registrarComment.trim()) {
-      setFormError('რეგისტრატორის ცვლილების შესანახად კომენტარი სავალდებულოა.');
       return;
     }
 
@@ -1567,11 +1561,7 @@ export default function RequestDetailsPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-700">
                         რეგისტრატორის კომენტარი
-                        {requiresRegistrarComment ? (
-                          <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>
-                        ) : (
-                          <span className="ml-2 text-xs text-slate-400">(პირველი მოქმედებისთვის არჩევითი)</span>
-                        )}
+                        <span className="ml-2 text-xs text-slate-400">(არჩევითი)</span>
                       </label>
                       <textarea
                         rows={3}
@@ -1691,11 +1681,7 @@ export default function RequestDetailsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">
                     რეგისტრატორის კომენტარი
-                    {requiresRegistrarComment ? (
-                      <span className="ml-2 text-xs text-red-500">(სავალდებულო)</span>
-                    ) : (
-                      <span className="ml-2 text-xs text-slate-400">(პირველი მოქმედებისთვის არჩევითი)</span>
-                    )}
+                    <span className="ml-2 text-xs text-slate-400">(არჩევითი)</span>
                   </label>
                   <textarea
                     rows={3}
@@ -1825,7 +1811,7 @@ export default function RequestDetailsPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs font-bold uppercase text-amber-700">სავალდებულო კომენტარი</div>
+                  <div className="text-xs font-bold uppercase text-amber-700">კომენტარი</div>
                   <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
                     {pendingUpdate.registrarComment || '-'}
                   </div>
