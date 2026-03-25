@@ -18,6 +18,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
     historyNumber: 'F',
     personalId: 'D',
     birthDate: '',
+    insurance: 'E',
     phone: '',
     address: '',
   },

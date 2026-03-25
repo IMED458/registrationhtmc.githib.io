@@ -14,6 +14,7 @@ export interface Patient {
   historyNumber: string;
   personalId: string;
   birthDate?: string;
+  insurance?: string;
   phone?: string;
   address?: string;
 }
@@ -118,6 +119,7 @@ export interface SystemSettings {
     historyNumber: string;
     personalId: string;
     birthDate: string;
+    insurance: string;
     phone: string;
     address: string;
   };

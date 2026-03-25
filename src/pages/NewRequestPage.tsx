@@ -87,6 +87,7 @@ export default function NewRequestPage() {
     historyNumber: '',
     personalId: '',
     birthDate: '',
+    insurance: '',
     phone: '',
     address: '',
     diagnoses: [createDiagnosisRow({ isPrimary: true })],
@@ -478,6 +479,7 @@ export default function NewRequestPage() {
           historyNumber: formData.historyNumber,
           personalId: formData.personalId,
           birthDate: formData.birthDate,
+          insurance: formData.insurance,
           phone: formData.phone,
           address: formData.address,
         },
@@ -671,7 +673,7 @@ export default function NewRequestPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">დაბადების თარიღი</label>
                 <input
@@ -679,6 +681,15 @@ export default function NewRequestPage() {
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={formData.birthDate}
                   onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">დაზღვევა</label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  value={formData.insurance}
+                  onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
                 />
               </div>
               <div className="space-y-2">

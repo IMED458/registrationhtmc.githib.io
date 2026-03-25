@@ -157,10 +157,15 @@ export default function PrintPage() {
               </tr>
 
               <tr className="border-b border-slate-900">
+                <td className="border-r border-slate-900 bg-slate-50 px-2 py-2 font-black uppercase text-slate-600">დაზღვევა</td>
+                <td className="border-r border-slate-900 px-2 py-2 font-medium text-slate-900">{request.patientData.insurance || '-'}</td>
                 <td className="border-r border-slate-900 bg-slate-50 px-2 py-2 font-black uppercase text-slate-600">ტელეფონი</td>
-                <td className="border-r border-slate-900 px-2 py-2 font-medium text-slate-900">{request.patientData.phone || '-'}</td>
+                <td className="px-2 py-2 font-medium text-slate-900">{request.patientData.phone || '-'}</td>
+              </tr>
+
+              <tr className="border-b border-slate-900">
                 <td className="border-r border-slate-900 bg-slate-50 px-2 py-2 font-black uppercase text-slate-600">მისამართი</td>
-                <td className="px-2 py-2 font-medium text-slate-900">{request.patientData.address || '-'}</td>
+                <td colSpan={3} className="px-2 py-2 font-medium text-slate-900">{request.patientData.address || '-'}</td>
               </tr>
 
               <tr className="border-b border-slate-900">

@@ -14,6 +14,7 @@ export default function FirebaseSetupPage() {
     historyNumber: string;
     personalId: string;
     birthDate?: string;
+    insurance?: string;
     phone?: string;
     address?: string;
   }>(null);
@@ -146,6 +147,7 @@ export default function FirebaseSetupPage() {
                 <div>ისტორია: {lookupResult.historyNumber || '-'}</div>
                 <div>პირადი ნომერი: {lookupResult.personalId || '-'}</div>
                 <div>დაბადების თარიღი: {lookupResult.birthDate || '-'}</div>
+                <div>დაზღვევა: {lookupResult.insurance || '-'}</div>
                 <div>ტელეფონი: {lookupResult.phone || '-'}</div>
                 <div className="md:col-span-2">მისამართი: {lookupResult.address || '-'}</div>
               </div>

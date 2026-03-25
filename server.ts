@@ -369,6 +369,7 @@ function mapPatientFromSheet(rows: string[][], settings: SystemSettings, history
   const historyNumberIndex = findColumnIndex(headers, settings.columnMapping.historyNumber);
   const personalIdIndex = findColumnIndex(headers, settings.columnMapping.personalId);
   const birthDateIndex = findColumnIndex(headers, settings.columnMapping.birthDate);
+  const insuranceIndex = findColumnIndex(headers, settings.columnMapping.insurance);
   const phoneIndex = findColumnIndex(headers, settings.columnMapping.phone);
   const addressIndex = findColumnIndex(headers, settings.columnMapping.address);
 
@@ -395,6 +396,7 @@ function mapPatientFromSheet(rows: string[][], settings: SystemSettings, history
     historyNumber: patientRow[historyNumberIndex] || "",
     personalId: patientRow[personalIdIndex] || "",
     birthDate: birthDateIndex >= 0 ? patientRow[birthDateIndex] || "" : "",
+    insurance: insuranceIndex >= 0 ? patientRow[insuranceIndex] || "" : "",
     phone: phoneIndex >= 0 ? patientRow[phoneIndex] || "" : "",
     address: addressIndex >= 0 ? patientRow[addressIndex] || "" : "",
   };

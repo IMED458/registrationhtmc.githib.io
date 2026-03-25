@@ -27,6 +27,7 @@ type RequestEditFormState = {
   historyNumber: string;
   personalId: string;
   birthDate: string;
+  insurance: string;
   phone: string;
   address: string;
   requestedAction: string;
@@ -131,6 +132,7 @@ function getPatientSignature(request: ClinicalRequest) {
     request.patientData.historyNumber || '',
     request.patientData.personalId || '',
     request.patientData.birthDate || '',
+    request.patientData.insurance || '',
     request.patientData.phone || '',
     request.patientData.address || '',
     request.requestedAction || '',
@@ -196,6 +198,7 @@ function buildFormDataFromRequest(
     historyNumber: data?.patientData.historyNumber || '',
     personalId: data?.patientData.personalId || '',
     birthDate: data?.patientData.birthDate || '',
+    insurance: data?.patientData.insurance || '',
     phone: data?.patientData.phone || '',
     address: data?.patientData.address || '',
     requestedAction: data?.requestedAction || '',
@@ -647,6 +650,7 @@ export default function RequestDetailsPage() {
             historyNumber: formData.historyNumber.trim(),
             personalId: formData.personalId.trim(),
             birthDate: formData.birthDate,
+            insurance: formData.insurance.trim(),
             phone: formData.phone.trim(),
             address: formData.address.trim(),
           },
@@ -697,6 +701,7 @@ export default function RequestDetailsPage() {
             historyNumber: formData.historyNumber.trim(),
             personalId: formData.personalId.trim(),
             birthDate: formData.birthDate,
+            insurance: formData.insurance.trim(),
             phone: formData.phone.trim(),
             address: formData.address.trim(),
           },
@@ -932,6 +937,19 @@ export default function RequestDetailsPage() {
                   />
                 ) : (
                   <div className="text-slate-700">{request.patientData.birthDate || '-'}</div>
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 uppercase font-bold">დაზღვევა</div>
+                {isDoctorInlineEditing ? (
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={formData.insurance}
+                    onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
+                  />
+                ) : (
+                  <div className="text-slate-700">{request.patientData.insurance || '-'}</div>
                 )}
               </div>
               <div>
@@ -1292,6 +1310,15 @@ export default function RequestDetailsPage() {
                             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
                             value={formData.birthDate}
                             onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-slate-700">დაზღვევა</label>
+                          <input
+                            type="text"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.insurance}
+                            onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
                           />
                         </div>
                         <div className="space-y-2">
