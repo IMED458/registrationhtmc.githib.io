@@ -51,6 +51,10 @@ function getRequestActionLabel(request: ClinicalRequest) {
     return request.consentStatus;
   }
 
+  if (request.requestedAction === 'სტაციონარი' && request.department?.trim()) {
+    return request.department.trim();
+  }
+
   return request.requestedAction;
 }
 
