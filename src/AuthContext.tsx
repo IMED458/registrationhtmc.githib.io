@@ -181,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     isAdmin: profile?.role === 'admin',
     canEditAdminContent: profile?.role === 'admin',
-    canAccessAdminPanel: profile?.role === 'admin' || profile?.role === 'admin_assistant',
+    canAccessAdminPanel: profile?.role === 'admin',
     canApproveAdminChanges: profile?.role === 'admin',
     isDoctorOrNurse: profile?.role === 'doctor' || profile?.role === 'nurse',
     isRegistrar: profile?.role === 'registrar',

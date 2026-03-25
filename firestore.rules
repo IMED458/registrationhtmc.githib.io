@@ -11,37 +11,60 @@ service cloud.firestore {
         : "";
     }
 
-    function isAllowedUser() {
+    function isAdmin() {
+      return isSignedIn() &&
+        userEmail() == "imedashviligio27@gmail.com";
+    }
+
+    function isDoctor() {
+      return isSignedIn() &&
+        userEmail() == "eringorokva@gmail.com";
+    }
+
+    function isRegistrar() {
       return isSignedIn() && (
-        userEmail() == "imedashviligio27@gmail.com" ||
-        userEmail() == "nino.nikaberidze@gmail.com" ||
-        userEmail() == "eringorokva@gmail.com" ||
         userEmail() == "emergencyhtmc14@gmail.com"
       );
     }
 
-    function isReadOnlyAdmin() {
+    function isViewer() {
       return isSignedIn() &&
         userEmail() == "nino.nikaberidze@gmail.com";
     }
 
+    function isAllowedUser() {
+      return isAdmin() || isDoctor() || isRegistrar() || isViewer();
+    }
+
     function canWriteData() {
-      return isSignedIn() && (
-        userEmail() == "imedashviligio27@gmail.com" ||
-        userEmail() == "eringorokva@gmail.com" ||
-        userEmail() == "emergencyhtmc14@gmail.com"
-      );
+      return isAdmin() || isDoctor() || isRegistrar();
     }
 
     match /users/{userId} {
       allow read: if isAllowedUser();
       allow create, update: if isAllowedUser() && request.auth.uid == userId;
-      allow delete: if canWriteData() && !isReadOnlyAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAllowedUser();
+      allow write: if canWriteData();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if canWriteData();
+      allow update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAllowedUser();
+      allow write: if isAdmin();
     }
 
     match /{document=**} {
       allow read: if isAllowedUser();
-      allow write: if canWriteData();
+      allow write: if isAdmin();
     }
   }
 }
