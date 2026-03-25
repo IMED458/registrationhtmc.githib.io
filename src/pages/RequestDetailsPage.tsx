@@ -4,7 +4,7 @@ import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
-import { normalizeRequestStatus, resolveRequestStatus } from '../requestStatusUtils';
+import { normalizeRequestStatus, resolveRequestStatus, resolveRequestStatusFromRequest } from '../requestStatusUtils';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
@@ -204,7 +204,7 @@ function buildFormDataFromRequest(
     consentStatus: data?.consentStatus || '',
     doctorComment: data?.doctorComment || '',
     diagnoses: diagnosisRows.length ? diagnosisRows : [createDiagnosisFormRow({ isPrimary: true })],
-    currentStatus: normalizeRequestStatus(data?.currentStatus || ''),
+    currentStatus: data ? resolveRequestStatusFromRequest(data) : '',
     finalDecision: data?.finalDecision || '',
     registrarComment: data?.registrarComment || '',
     registrarName: data?.registrarName || profileFullName || '',
@@ -252,7 +252,7 @@ export default function RequestDetailsPage() {
       return;
     }
 
-    if (request.currentStatus !== 'ახალი') {
+    if (resolveRequestStatusFromRequest(request) !== 'ახალი') {
       autoStatusSyncRef.current = false;
       return;
     }

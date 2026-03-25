@@ -1,4 +1,4 @@
-import { RequestStatus } from './types';
+import { ClinicalRequest, RequestStatus } from './types';
 
 export const LEGACY_INSURANCE_APPROVAL_STATUS = 'უარყოფილია, თანხმდება დაზღვევასთან';
 export const INSURANCE_APPROVAL_STATUS: RequestStatus = 'თანხმდება დაზღვევასთან';
@@ -41,4 +41,16 @@ export function resolveRequestStatusFromFinalDecision(
   finalDecision?: string | null,
 ) {
   return resolveRequestStatus(currentStatus, '', finalDecision);
+}
+
+export function resolveRequestStatusFromRequest(
+  request: Pick<ClinicalRequest, 'currentStatus' | 'requestedAction' | 'finalDecision'>,
+) {
+  const normalizedCurrentStatus = normalizeRequestStatus(request.currentStatus || '') || 'ახალი';
+
+  return resolveRequestStatus(
+    normalizedCurrentStatus as RequestStatus,
+    request.requestedAction,
+    request.finalDecision,
+  );
 }

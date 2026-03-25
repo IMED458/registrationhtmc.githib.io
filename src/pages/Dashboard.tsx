@@ -7,7 +7,7 @@ import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { getDiagnosisEntries, getDiagnosisSearchText, normalizeIcdCode } from '../icd10Utils';
-import { normalizeRequestStatus } from '../requestStatusUtils';
+import { normalizeRequestStatus, resolveRequestStatusFromRequest } from '../requestStatusUtils';
 import { getStudyTypeSummary } from '../studyTypeUtils';
 import { isArchivedRequest } from '../archiveUtils';
 import { ClinicalRequest, RequestStatus } from '../types';
@@ -209,7 +209,7 @@ export default function Dashboard() {
   const [completingRequestId, setCompletingRequestId] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
-  const getDisplayStatus = (request: ClinicalRequest) => normalizeRequestStatus(request.currentStatus);
+  const getDisplayStatus = (request: ClinicalRequest) => resolveRequestStatusFromRequest(request);
 
   useEffect(() => {
     if (!profile) {

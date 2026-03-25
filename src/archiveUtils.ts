@@ -1,5 +1,5 @@
 import { ClinicalRequest, RequestStatus } from './types';
-import { INSURANCE_APPROVAL_STATUS, normalizeRequestStatus } from './requestStatusUtils';
+import { INSURANCE_APPROVAL_STATUS, normalizeRequestStatus, resolveRequestStatusFromRequest } from './requestStatusUtils';
 
 export const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000;
 export const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -61,7 +61,7 @@ export function shouldArchiveRequest(request: ClinicalRequest, now = Date.now())
     return false;
   }
 
-  if (!isArchiveEligibleStatus(request.currentStatus)) {
+  if (!isArchiveEligibleStatus(resolveRequestStatusFromRequest(request))) {
     return false;
   }
 
