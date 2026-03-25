@@ -555,19 +555,18 @@ export default function Dashboard() {
                 )}
               </div>
               {isRegistrar && canRegistrarCompleteRequest(req) && (
-                <label className="mt-3 inline-flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+                <label
+                  className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700"
+                  title={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
+                >
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                     checked={getDisplayStatus(req) === 'დასრულებულია'}
                     disabled={getDisplayStatus(req) === 'დასრულებულია' || completingRequestId === req.id}
                     onChange={() => handleMarkRequestCompleted(req)}
+                    aria-label={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
                   />
-                  <span>
-                    {getDisplayStatus(req) === 'დასრულებულია'
-                      ? 'დასრულებულია'
-                      : 'დასრულებულში გადატანა'}
-                  </span>
                   {completingRequestId === req.id && <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />}
                 </label>
               )}
@@ -673,19 +672,18 @@ export default function Dashboard() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex flex-col items-end gap-3">
                         {isRegistrar && canRegistrarCompleteRequest(req) && (
-                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">
+                          <label
+                            className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
+                            title={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
+                          >
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                               checked={getDisplayStatus(req) === 'დასრულებულია'}
                               disabled={getDisplayStatus(req) === 'დასრულებულია' || completingRequestId === req.id}
                               onChange={() => handleMarkRequestCompleted(req)}
+                              aria-label={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
                             />
-                            <span>
-                              {getDisplayStatus(req) === 'დასრულებულია'
-                                ? 'დასრულებულია'
-                                : 'დასრულებულში'}
-                            </span>
                             {completingRequestId === req.id && <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />}
                           </label>
                         )}
