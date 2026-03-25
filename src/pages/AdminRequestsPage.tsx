@@ -13,14 +13,14 @@ import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
 
 export default function AdminRequestsPage() {
-  const { isAdmin, profile } = useAuth();
+  const { canAccessAdminPanel, canApproveAdminChanges, profile } = useAuth();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingRequestId, setConfirmingRequestId] = useState('');
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canAccessAdminPanel) {
       setLoading(false);
       return;
     }
@@ -46,10 +46,10 @@ export default function AdminRequestsPage() {
     );
 
     return unsubscribe;
-  }, [isAdmin]);
+  }, [canAccessAdminPanel]);
 
   const handleConfirmRequest = async (request: ClinicalRequest) => {
-    if (!profile || confirmingRequestId) {
+    if (!profile || confirmingRequestId || !canApproveAdminChanges) {
       return;
     }
 
@@ -99,7 +99,7 @@ export default function AdminRequestsPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!canAccessAdminPanel) {
     return <div className="text-center p-12 text-red-500 font-bold">წვდომა აკრძალულია</div>;
   }
 
@@ -108,6 +108,11 @@ export default function AdminRequestsPage() {
       <div>
         <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნები</h2>
         <p className="text-slate-500">რეგისტრატორის და ექიმის ცვლილებები, რომლებიც ადმინისტრატორის დადასტურებას ელოდება</p>
+        {!canApproveAdminChanges && (
+          <p className="mt-2 text-sm font-bold text-amber-700">
+            ამ ანგარიშს მოთხოვნების დადასტურების უფლება არ აქვს.
+          </p>
+        )}
       </div>
 
       {loading ? (
@@ -194,15 +199,21 @@ export default function AdminRequestsPage() {
                     <MoreHorizontal className="h-4 w-4" />
                     დეტალები
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmRequest(request)}
-                    disabled={confirmingRequestId === request.id}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    {confirmingRequestId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    დადასტურება
-                  </button>
+                  {canApproveAdminChanges ? (
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmRequest(request)}
+                      disabled={confirmingRequestId === request.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {confirmingRequestId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      დადასტურება
+                    </button>
+                  ) : (
+                    <div className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-500">
+                      მხოლოდ ნახვა
+                    </div>
+                  )}
                 </div>
               </div>
                 );

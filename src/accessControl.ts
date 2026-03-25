@@ -12,6 +12,11 @@ export const ALLOWED_USERS: Record<string, AllowedUserConfig> = {
     label: 'ადმინისტრატორი',
     displayName: 'გ.იმედაშვილი',
   },
+  'nino.nikaberidze@gmail.com': {
+    role: 'admin_assistant',
+    label: 'ადმინისტრატორი',
+    displayName: 'ნინო ნიკაბერიძე',
+  },
   'eringorokva@gmail.com': {
     role: 'doctor',
     label: 'ექიმი/ექთანი',
@@ -81,6 +86,8 @@ export function resolveUserDisplayName(name?: string | null, email?: string | nu
       return 'ემერჯენსი';
     case 'imedashviligio27':
       return 'გ.იმედაშვილი';
+    case 'nino.nikaberidze':
+      return 'ნინო ნიკაბერიძე';
     case 'emergencyhtmc14':
       return 'რეგისტრატურა';
     default:
@@ -91,6 +98,7 @@ export function resolveUserDisplayName(name?: string | null, email?: string | nu
 export function getRoleLabel(role?: UserRole | null) {
   switch (role) {
     case 'admin':
+    case 'admin_assistant':
       return 'ადმინისტრატორი';
     case 'doctor':
       return 'ექიმი/ექთანი';

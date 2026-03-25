@@ -12,7 +12,7 @@ import { ClinicalRequest } from '../types';
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, isDoctorOrNurse, isRegistrar } = useAuth();
+  const { profile, isAdmin, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
@@ -207,7 +207,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {!isSidebarCollapsed && 'მთავარი პანელი'}
             </NavLink>
             
-            {(isDoctorOrNurse || isAdmin) && (
+            {(isDoctorOrNurse || canAccessAdminPanel) && (
               <NavLink
                 to="/new-request"
                 className={navItemClassName}
@@ -227,7 +227,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {!isSidebarCollapsed && 'არქივი'}
             </NavLink>
 
-            {isAdmin && (
+            {canAccessAdminPanel && (
               <NavLink
                 to="/admin-requests"
                 className={navItemClassName}
@@ -250,7 +250,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </NavLink>
             )}
 
-            {isAdmin && (
+            {canAccessAdminPanel && (
               <NavLink
                 to="/settings"
                 className={navItemClassName}
@@ -269,13 +269,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
-        <div className={`grid gap-2 ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
+        <div className={`grid gap-2 ${canAccessAdminPanel ? 'grid-cols-5' : 'grid-cols-3'}`}>
           <NavLink to="/" className={mobileNavItemClassName}>
             <LayoutDashboard className="h-5 w-5" />
             <span className="text-xs">მთავარი</span>
           </NavLink>
 
-          {(isDoctorOrNurse || isAdmin) ? (
+          {(isDoctorOrNurse || canAccessAdminPanel) ? (
             <NavLink to="/new-request" className={mobileNavItemClassName}>
               <FilePlus className="h-5 w-5" />
               <span className="text-xs">მოთხოვნა</span>
@@ -291,7 +291,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="text-xs">არქივი</span>
           </NavLink>
 
-          {isAdmin ? (
+          {canAccessAdminPanel ? (
             <NavLink to="/admin-requests" className={mobileNavItemClassName}>
               <div className="relative">
                 <ClipboardList className="h-5 w-5" />
@@ -305,7 +305,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ) : null}
 
-          {isAdmin ? (
+          {canAccessAdminPanel ? (
             <NavLink to="/settings" className={mobileNavItemClassName}>
               <Settings className="h-5 w-5" />
               <span className="text-xs">ადმინი</span>

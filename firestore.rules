@@ -14,6 +14,7 @@ service cloud.firestore {
     function isAllowedUser() {
       return isSignedIn() && (
         userEmail() == "imedashviligio27@gmail.com" ||
+        userEmail() == "nino.nikaberidze@gmail.com" ||
         userEmail() == "eringorokva@gmail.com" ||
         userEmail() == "emergencyhtmc14@gmail.com"
       );

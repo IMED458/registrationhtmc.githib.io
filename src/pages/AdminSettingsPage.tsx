@@ -18,7 +18,7 @@ function mergeSystemSettings(input?: Partial<SystemSettings> | null): SystemSett
 }
 
 export default function AdminSettingsPage() {
-  const { isAdmin, profile } = useAuth();
+  const { canAccessAdminPanel, canApproveAdminChanges, profile } = useAuth();
   const navigate = useNavigate();
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -30,7 +30,7 @@ export default function AdminSettingsPage() {
   const isRegistrarDeleted = (settings.disabledEmails ?? []).includes(REGISTRAR_EMAIL);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canAccessAdminPanel) return;
 
     const fetchSettings = async () => {
       const docSnap = await getDoc(doc(db, 'settings', 'global'));
@@ -60,7 +60,7 @@ export default function AdminSettingsPage() {
       unsubscribeLogs();
       unsubscribeRequests();
     };
-  }, [isAdmin]);
+  }, [canAccessAdminPanel]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +150,7 @@ export default function AdminSettingsPage() {
   };
 
   const handleConfirmEditedRequest = async (request: ClinicalRequest) => {
-    if (!profile || confirmingRequestId) {
+    if (!profile || confirmingRequestId || !canApproveAdminChanges) {
       return;
     }
 
@@ -196,13 +196,18 @@ export default function AdminSettingsPage() {
     }
   };
 
-  if (!isAdmin) return <div className="text-center p-12 text-red-500 font-bold">წვდომა აკრძალულია</div>;
+  if (!canAccessAdminPanel) return <div className="text-center p-12 text-red-500 font-bold">წვდომა აკრძალულია</div>;
 
   return (
     <div className="w-full max-w-none space-y-8 pb-12">
       <div>
         <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">ადმინისტრირება</h2>
         <p className="text-slate-500">სისტემის პარამეტრები და აუდიტი</p>
+        {!canApproveAdminChanges && (
+          <p className="mt-2 text-sm font-bold text-amber-700">
+            ამ ანგარიშს რედაქტირებების დადასტურების უფლება არ აქვს.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -371,14 +376,20 @@ export default function AdminSettingsPage() {
                           >
                             დეტალები
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleConfirmEditedRequest(request)}
-                            disabled={confirmingRequestId === request.id}
-                            className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            {confirmingRequestId === request.id ? 'ინახება...' : 'დადასტურება'}
-                          </button>
+                          {canApproveAdminChanges ? (
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmEditedRequest(request)}
+                              disabled={confirmingRequestId === request.id}
+                              className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {confirmingRequestId === request.id ? 'ინახება...' : 'დადასტურება'}
+                            </button>
+                          ) : (
+                            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-center font-bold text-slate-500">
+                              მხოლოდ ნახვა
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
