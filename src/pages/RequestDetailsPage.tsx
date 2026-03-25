@@ -4,7 +4,7 @@ import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
-import { normalizeRequestStatus, resolveRequestStatusFromFinalDecision } from '../requestStatusUtils';
+import { normalizeRequestStatus, resolveRequestStatus } from '../requestStatusUtils';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
@@ -523,8 +523,9 @@ export default function RequestDetailsPage() {
     setFormData((current) => ({
       ...current,
       finalDecision: nextFinalDecision,
-      currentStatus: resolveRequestStatusFromFinalDecision(
+      currentStatus: resolveRequestStatus(
         current.currentStatus as ClinicalRequest['currentStatus'],
+        current.requestedAction,
         nextFinalDecision,
       ),
     }));
@@ -572,8 +573,9 @@ export default function RequestDetailsPage() {
         return;
       }
 
-      const resolvedCurrentStatus = resolveRequestStatusFromFinalDecision(
+      const resolvedCurrentStatus = resolveRequestStatus(
         formData.currentStatus as ClinicalRequest['currentStatus'],
+        formData.requestedAction,
         formData.finalDecision,
       );
 

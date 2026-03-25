@@ -8,6 +8,7 @@ import { resolveUserDisplayName } from '../accessControl';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } from '../icd10Lookup';
 import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
+import { resolveRequestStatus } from '../requestStatusUtils';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { resolveServerApiUrl } from '../serverApi';
 import { sanitizeStudyTypes } from '../studyTypeUtils';
@@ -494,7 +495,7 @@ export default function NewRequestPage() {
         icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
         diagnoses,
         doctorComment: formData.doctorComment,
-        currentStatus: 'ახალი',
+        currentStatus: resolveRequestStatus('ახალი', formData.requestedAction, ''),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };

@@ -21,11 +21,24 @@ export function normalizeRequestStatus(status?: string | null) {
   return normalizedStatus;
 }
 
+export function resolveRequestStatus(
+  currentStatus: RequestStatus,
+  requestedAction?: string | null,
+  finalDecision?: string | null,
+) {
+  const normalizedRequestedAction = String(requestedAction || '').trim();
+  const normalizedFinalDecision = String(finalDecision || '').trim();
+
+  if (normalizedRequestedAction === 'სტაციონარი') {
+    return 'დასრულებულია' as RequestStatus;
+  }
+
+  return FINAL_DECISION_STATUS_MAP[normalizedFinalDecision] || currentStatus;
+}
+
 export function resolveRequestStatusFromFinalDecision(
   currentStatus: RequestStatus,
   finalDecision?: string | null,
 ) {
-  const normalizedFinalDecision = String(finalDecision || '').trim();
-
-  return FINAL_DECISION_STATUS_MAP[normalizedFinalDecision] || currentStatus;
+  return resolveRequestStatus(currentStatus, '', finalDecision);
 }
