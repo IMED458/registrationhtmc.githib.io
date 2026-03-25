@@ -35,18 +35,6 @@ function getRequestTimestampValue(request: ClinicalRequest) {
   return 0;
 }
 
-function getRequestUpdatedTimestampValue(request: ClinicalRequest) {
-  if (request.updatedAt?.toMillis) {
-    return request.updatedAt.toMillis();
-  }
-
-  if (request.updatedAt?.seconds) {
-    return request.updatedAt.seconds * 1000;
-  }
-
-  return getRequestTimestampValue(request);
-}
-
 function getBaseRequestActionLabel(request: ClinicalRequest) {
   if (request.requestedAction === 'სტაციონარი' && request.department?.trim()) {
     return request.department.trim();
@@ -161,7 +149,7 @@ function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
         return priorityDiff;
       }
 
-      return getRequestUpdatedTimestampValue(right) - getRequestUpdatedTimestampValue(left);
+      return getRequestTimestampValue(right) - getRequestTimestampValue(left);
     },
   );
 }
@@ -199,7 +187,7 @@ function DiagnosisList({ request }: { request: ClinicalRequest }) {
 }
 
 export default function Dashboard() {
-  const { profile, isDoctorOrNurse, isAdmin, isRegistrar } = useAuth();
+  const { profile, isDoctorOrNurse, isAdmin, canAccessAdminPanel, isRegistrar } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestsError, setRequestsError] = useState('');
@@ -387,7 +375,7 @@ export default function Dashboard() {
           <p className="text-slate-500">პაციენტების გადამისამართების მართვა</p>
         </div>
         
-        {(isDoctorOrNurse || isAdmin) && (
+        {(isDoctorOrNurse || canAccessAdminPanel) && (
           <Link
             to="/new-request"
             className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition-all shadow-lg shadow-emerald-100"
