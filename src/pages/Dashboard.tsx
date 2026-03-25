@@ -46,11 +46,7 @@ function getRequestUpdatedTimestampValue(request: ClinicalRequest) {
   return getRequestTimestampValue(request);
 }
 
-function getRequestActionLabel(request: ClinicalRequest) {
-  if (request.consentStatus?.startsWith('უარი')) {
-    return request.consentStatus;
-  }
-
+function getBaseRequestActionLabel(request: ClinicalRequest) {
   if (request.requestedAction === 'სტაციონარი' && request.department?.trim()) {
     return request.department.trim();
   }
@@ -58,20 +54,66 @@ function getRequestActionLabel(request: ClinicalRequest) {
   return request.requestedAction;
 }
 
-function getRequestActionBadgeClass(request: ClinicalRequest) {
-  if (request.consentStatus?.startsWith('უარი')) {
-    return 'border-red-200 bg-red-50 text-red-600';
+function getRequestActionBadges(request: ClinicalRequest) {
+  const baseLabel = getBaseRequestActionLabel(request);
+  const consentLabel = request.consentStatus?.trim() || '';
+
+  if (request.requestedAction === 'ბინა') {
+    const badges = [
+      {
+        label: baseLabel,
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      },
+    ];
+
+    if (consentLabel.startsWith('უარი')) {
+      badges.push({
+        label: consentLabel,
+        className: 'border-red-200 bg-red-50 text-red-600',
+      });
+    }
+
+    return badges;
+  }
+
+  if (consentLabel.startsWith('უარი')) {
+    return [
+      {
+        label: consentLabel,
+        className: 'border-red-200 bg-red-50 text-red-600',
+      },
+    ];
   }
 
   switch (request.requestedAction) {
     case 'ბინა':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      return [
+        {
+          label: baseLabel,
+          className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        },
+      ];
     case 'სტაციონარი':
-      return 'border-violet-200 bg-violet-50 text-violet-700';
+      return [
+        {
+          label: baseLabel,
+          className: 'border-violet-200 bg-violet-50 text-violet-700',
+        },
+      ];
     case 'კვლევა':
-      return 'border-sky-200 bg-sky-50 text-sky-700';
+      return [
+        {
+          label: baseLabel,
+          className: 'border-sky-200 bg-sky-50 text-sky-700',
+        },
+      ];
     default:
-      return 'border-slate-200 bg-slate-50 text-slate-700';
+      return [
+        {
+          label: baseLabel,
+          className: 'border-slate-200 bg-slate-50 text-slate-700',
+        },
+      ];
   }
 }
 
@@ -204,7 +246,10 @@ export default function Dashboard() {
       diagnosisSearchText.includes(searchTerm.toLowerCase()) ||
       studyTypeSearchText.includes(searchTerm.toLowerCase()) ||
       (normalizedIcdSearch ? normalizedRequestCode.includes(normalizedIcdSearch) : false) ||
-      getRequestActionLabel(req).toLowerCase().includes(searchTerm.toLowerCase());
+      getRequestActionBadges(req)
+        .map((badge) => badge.label.toLowerCase())
+        .join(' ')
+        .includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'ყველა' || req.currentStatus === statusFilter;
     
@@ -387,12 +432,17 @@ export default function Dashboard() {
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">მოთხოვნა</div>
                   <div className="mt-2">
-                    <span className={cn(
-                      'inline-flex rounded-xl border px-3 py-1.5 text-sm font-black',
-                      getRequestActionBadgeClass(req),
-                    )}>
-                      {getRequestActionLabel(req)}
-                    </span>
+                    {getRequestActionBadges(req).map((badge) => (
+                      <span
+                        key={`${req.id}-${badge.label}`}
+                        className={cn(
+                          'inline-flex rounded-xl border px-3 py-1.5 text-sm font-black',
+                          badge.className,
+                        )}
+                      >
+                        {badge.label}
+                      </span>
+                    ))}
                   </div>
                   {getStudyTypeSummary(req) && (
                     <div className="mt-1 text-xs font-bold text-emerald-600">{getStudyTypeSummary(req)}</div>
@@ -506,12 +556,17 @@ export default function Dashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={cn(
-                          'inline-flex rounded-xl border px-3 py-1.5 text-sm font-black',
-                          getRequestActionBadgeClass(req),
-                        )}>
-                          {getRequestActionLabel(req)}
-                        </span>
+                        {getRequestActionBadges(req).map((badge) => (
+                          <span
+                            key={`${req.id}-${badge.label}`}
+                            className={cn(
+                              'inline-flex rounded-xl border px-3 py-1.5 text-sm font-black',
+                              badge.className,
+                            )}
+                          >
+                            {badge.label}
+                          </span>
+                        ))}
                       </div>
                       {getStudyTypeSummary(req) && <div className="text-xs text-emerald-600 font-bold">{getStudyTypeSummary(req)}</div>}
                     </td>
