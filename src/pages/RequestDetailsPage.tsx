@@ -43,6 +43,11 @@ type RequestEditFormState = {
   doctorEditComment: string;
 };
 
+const HIDDEN_FINAL_DECISIONS = new Set([
+  'თანახმაა კვლევაზე',
+  'არ არის თანახმა',
+]);
+
 function createDiagnosisRowId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -365,7 +370,9 @@ export default function RequestDetailsPage() {
   const finalDecisionOptions = Array.from(
     new Set([
       ...FINAL_DECISIONS.filter((decision) => decision !== 'გაუქმებულია'),
-      ...(formData.finalDecision ? [formData.finalDecision] : []),
+      ...(formData.finalDecision && !HIDDEN_FINAL_DECISIONS.has(formData.finalDecision)
+        ? [formData.finalDecision]
+        : []),
     ]),
   );
 
