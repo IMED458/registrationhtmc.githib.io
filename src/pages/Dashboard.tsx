@@ -58,10 +58,21 @@ function getRequestActionLabel(request: ClinicalRequest) {
   return request.requestedAction;
 }
 
-function getRequestActionTextClass(request: ClinicalRequest) {
-  return request.consentStatus?.startsWith('უარი')
-    ? 'text-red-600'
-    : 'text-slate-700';
+function getRequestActionBadgeClass(request: ClinicalRequest) {
+  if (request.consentStatus?.startsWith('უარი')) {
+    return 'border-red-200 bg-red-50 text-red-600';
+  }
+
+  switch (request.requestedAction) {
+    case 'ბინა':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    case 'სტაციონარი':
+      return 'border-violet-200 bg-violet-50 text-violet-700';
+    case 'კვლევა':
+      return 'border-sky-200 bg-sky-50 text-sky-700';
+    default:
+      return 'border-slate-200 bg-slate-50 text-slate-700';
+  }
 }
 
 function getCreatedAtLabel(request: ClinicalRequest) {
@@ -375,8 +386,13 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">მოთხოვნა</div>
-                  <div className={`mt-1 text-sm font-bold ${getRequestActionTextClass(req)}`}>
-                    {getRequestActionLabel(req)}
+                  <div className="mt-2">
+                    <span className={cn(
+                      'inline-flex rounded-xl border px-3 py-1.5 text-sm font-black',
+                      getRequestActionBadgeClass(req),
+                    )}>
+                      {getRequestActionLabel(req)}
+                    </span>
                   </div>
                   {getStudyTypeSummary(req) && (
                     <div className="mt-1 text-xs font-bold text-emerald-600">{getStudyTypeSummary(req)}</div>
@@ -489,8 +505,13 @@ export default function Dashboard() {
                       <div className="text-xs text-slate-400">{req.patientData.personalId}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className={`text-sm font-medium ${getRequestActionTextClass(req)}`}>
-                        {getRequestActionLabel(req)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={cn(
+                          'inline-flex rounded-xl border px-3 py-1.5 text-sm font-black',
+                          getRequestActionBadgeClass(req),
+                        )}>
+                          {getRequestActionLabel(req)}
+                        </span>
                       </div>
                       {getStudyTypeSummary(req) && <div className="text-xs text-emerald-600 font-bold">{getStudyTypeSummary(req)}</div>}
                     </td>
