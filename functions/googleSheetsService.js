@@ -1,13 +1,16 @@
 const { google } = require('googleapis');
 const XLSX = require('xlsx');
 
-const DEFAULT_GOOGLE_SHEET_URL =
+const LEGACY_DEFAULT_GOOGLE_SHEET_URL =
   'https://docs.google.com/spreadsheets/d/1sBG8LsgOrRhkvibB0cOpLihW8GEI1YhP/edit?usp=sharing&ouid=104679229217623816115&rtpof=true&sd=true';
+
+const DEFAULT_GOOGLE_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/1zsuLPC1hDVJ1pzGMsk_LY1bILCF6Dbd7/edit?gid=226530235#gid=226530235';
 
 const DEFAULT_SYSTEM_SETTINGS = {
   googleSheetsId: DEFAULT_GOOGLE_SHEET_URL,
   googleDriveFolderId: '',
-  sheetName: 'თებერვალი',
+  sheetName: '',
   sheetGid: '',
   disabledEmails: [],
   columnMapping: {
@@ -35,8 +38,16 @@ function getGoogleAuthClient() {
   });
 }
 
+function shouldUseNewDefaultSheetSource(googleSheetsId) {
+  const normalizedValue = extractSpreadsheetId(String(googleSheetsId || ''));
+  const legacyId = extractSpreadsheetId(LEGACY_DEFAULT_GOOGLE_SHEET_URL);
+  const currentId = extractSpreadsheetId(DEFAULT_GOOGLE_SHEET_URL);
+
+  return !normalizedValue || normalizedValue === legacyId || normalizedValue === currentId;
+}
+
 function mergeSystemSettings(input) {
-  return {
+  const mergedSettings = {
     ...DEFAULT_SYSTEM_SETTINGS,
     ...(input || {}),
     columnMapping: {
@@ -44,6 +55,16 @@ function mergeSystemSettings(input) {
       ...((input && input.columnMapping) || {}),
     },
   };
+
+  if (shouldUseNewDefaultSheetSource(mergedSettings.googleSheetsId)) {
+    mergedSettings.googleSheetsId = DEFAULT_GOOGLE_SHEET_URL;
+
+    if (!mergedSettings.sheetName || String(mergedSettings.sheetName).trim() === 'თებერვალი') {
+      mergedSettings.sheetName = '';
+    }
+  }
+
+  return mergedSettings;
 }
 
 function extractSpreadsheetId(value) {

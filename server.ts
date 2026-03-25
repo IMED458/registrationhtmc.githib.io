@@ -6,7 +6,7 @@ import path from "path";
 import cors from "cors";
 import { google } from "googleapis";
 import * as XLSX from "xlsx";
-import { DEFAULT_SYSTEM_SETTINGS } from "./src/defaultSystemSettings";
+import { DEFAULT_SYSTEM_SETTINGS, normalizeSystemSettings } from "./src/defaultSystemSettings";
 import { SystemSettings } from "./src/types";
 
 dotenv.config({ path: ".env.local" });
@@ -32,14 +32,7 @@ function getGoogleAuthClient() {
 }
 
 function mergeSystemSettings(input: Partial<SystemSettings> | null | undefined): SystemSettings {
-  return {
-    ...DEFAULT_SYSTEM_SETTINGS,
-    ...input,
-    columnMapping: {
-      ...DEFAULT_SYSTEM_SETTINGS.columnMapping,
-      ...(input?.columnMapping || {}),
-    },
-  };
+  return normalizeSystemSettings(input);
 }
 
 function extractSpreadsheetId(value: string) {

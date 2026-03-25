@@ -4,7 +4,7 @@ import { REGISTRAR_EMAIL } from '../accessControl';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
-import { DEFAULT_SYSTEM_SETTINGS } from '../defaultSystemSettings';
+import { DEFAULT_SYSTEM_SETTINGS, normalizeSystemSettings } from '../defaultSystemSettings';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { SystemSettings, AuditLog, ClinicalRequest } from '../types';
 import { CheckCircle2, Database, History, Loader2, Save, ShieldOff, Trash2, Undo2 } from 'lucide-react';
@@ -13,15 +13,7 @@ import { ka } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 
 function mergeSystemSettings(input?: Partial<SystemSettings> | null): SystemSettings {
-  return {
-    ...DEFAULT_SYSTEM_SETTINGS,
-    ...input,
-    disabledEmails: input?.disabledEmails ?? DEFAULT_SYSTEM_SETTINGS.disabledEmails,
-    columnMapping: {
-      ...DEFAULT_SYSTEM_SETTINGS.columnMapping,
-      ...(input?.columnMapping ?? {}),
-    },
-  };
+  return normalizeSystemSettings(input);
 }
 
 export default function AdminSettingsPage() {

@@ -1,4 +1,4 @@
-import { DEFAULT_SYSTEM_SETTINGS } from './defaultSystemSettings';
+import { normalizeSystemSettings } from './defaultSystemSettings';
 import { SystemSettings } from './types';
 
 type WorkbookSheetRows = {
@@ -13,17 +13,6 @@ function extractSpreadsheetId(value: string) {
   const match = trimmedValue.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
 
   return match ? match[1] : trimmedValue;
-}
-
-function normalizeSettings(input?: Partial<SystemSettings> | null): SystemSettings {
-  return {
-    ...DEFAULT_SYSTEM_SETTINGS,
-    ...input,
-    columnMapping: {
-      ...DEFAULT_SYSTEM_SETTINGS.columnMapping,
-      ...(input?.columnMapping || {}),
-    },
-  };
 }
 
 function normalizeCellValue(value: unknown) {
@@ -154,7 +143,7 @@ export async function lookupPatientFromSheet(
   historyNumber: string,
   personalId: string,
 ) {
-  const settings = normalizeSettings(input);
+  const settings = normalizeSystemSettings(input);
   const workbookSheets = await fetchWorkbookSheets(settings);
 
   for (const sheet of workbookSheets) {

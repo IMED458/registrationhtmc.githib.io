@@ -4,6 +4,7 @@ import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
+import { resolveRequestStatusFromFinalDecision } from '../requestStatusUtils';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
@@ -511,6 +512,17 @@ export default function RequestDetailsPage() {
     setConfirmAction('approve');
   };
 
+  const handleFinalDecisionChange = (nextFinalDecision: string) => {
+    setFormData((current) => ({
+      ...current,
+      finalDecision: nextFinalDecision,
+      currentStatus: resolveRequestStatusFromFinalDecision(
+        current.currentStatus as ClinicalRequest['currentStatus'],
+        nextFinalDecision,
+      ),
+    }));
+  };
+
   const submitUpdate = async (actionOverride?: ConfirmAction) => {
     const action = actionOverride ?? confirmAction;
 
@@ -553,8 +565,13 @@ export default function RequestDetailsPage() {
         return;
       }
 
+      const resolvedCurrentStatus = resolveRequestStatusFromFinalDecision(
+        formData.currentStatus as ClinicalRequest['currentStatus'],
+        formData.finalDecision,
+      );
+
       const baseUpdate = {
-        currentStatus: formData.currentStatus,
+        currentStatus: resolvedCurrentStatus,
         finalDecision: formData.finalDecision,
         registrarComment: formData.registrarComment.trim(),
         registrarName: formData.registrarName,
@@ -564,7 +581,7 @@ export default function RequestDetailsPage() {
 
       if (isRegistrarOnly) {
         const pendingNotification: PendingRegistrarUpdate = {
-          currentStatus: formData.currentStatus as ClinicalRequest['currentStatus'],
+          currentStatus: resolvedCurrentStatus,
           finalDecision: formData.finalDecision,
           registrarComment: formData.registrarComment.trim(),
           registrarName: formData.registrarName,
@@ -597,8 +614,8 @@ export default function RequestDetailsPage() {
           actionType: 'REGISTRAR_EDIT',
           oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
           newValue: formData.registrarComment.trim()
-            ? `${getUpdateSummary(formData.currentStatus, formData.finalDecision)} / კომენტარი: ${formData.registrarComment.trim()}`
-            : getUpdateSummary(formData.currentStatus, formData.finalDecision),
+            ? `${getUpdateSummary(resolvedCurrentStatus, formData.finalDecision)} / კომენტარი: ${formData.registrarComment.trim()}`
+            : getUpdateSummary(resolvedCurrentStatus, formData.finalDecision),
         });
 
         setConfirmAction(null);
@@ -687,7 +704,7 @@ export default function RequestDetailsPage() {
           diagnosis: representativeDiagnosis?.diagnosis || '',
           icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
           diagnoses,
-          currentStatus: formData.currentStatus,
+          currentStatus: resolvedCurrentStatus,
           finalDecision: formData.finalDecision,
           registrarComment: formData.registrarComment.trim(),
           registrarName: formData.registrarName.trim(),
@@ -708,7 +725,7 @@ export default function RequestDetailsPage() {
           requestId: id,
           actionType: 'ADMIN_FULL_EDIT',
           oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getUpdateSummary(request.currentStatus, request.finalDecision)}`,
-          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getUpdateSummary(formData.currentStatus, formData.finalDecision)}`,
+          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getUpdateSummary(resolvedCurrentStatus, formData.finalDecision)}`,
         });
 
         setConfirmAction(null);
@@ -737,7 +754,7 @@ export default function RequestDetailsPage() {
         requestId: id,
         actionType: 'UPDATE',
         oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-        newValue: getUpdateSummary(formData.currentStatus, formData.finalDecision),
+        newValue: getUpdateSummary(resolvedCurrentStatus, formData.finalDecision),
       });
 
       setConfirmAction(null);
@@ -1366,7 +1383,7 @@ export default function RequestDetailsPage() {
                             <select
                               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                               value={formData.finalDecision}
-                              onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
+                              onChange={(e) => handleFinalDecisionChange(e.target.value)}
                             >
                               <option value="">აირჩიეთ...</option>
                               {finalDecisionOptions.map((decision) => (
@@ -1506,7 +1523,7 @@ export default function RequestDetailsPage() {
                       <select
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                         value={formData.finalDecision}
-                        onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
+                        onChange={(e) => handleFinalDecisionChange(e.target.value)}
                       >
                         <option value="">აირჩიეთ...</option>
                         {finalDecisionOptions.map((decision) => (
@@ -1630,7 +1647,7 @@ export default function RequestDetailsPage() {
                   <select
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                     value={formData.finalDecision}
-                    onChange={(e) => setFormData({ ...formData, finalDecision: e.target.value })}
+                    onChange={(e) => handleFinalDecisionChange(e.target.value)}
                   >
                     <option value="">აირჩიეთ...</option>
                     {finalDecisionOptions.map((decision) => (

@@ -8,6 +8,7 @@ const ARCHIVE_READY_STATUSES: RequestStatus[] = [
   'დადასტურებულია',
   'დასრულებულია',
   'უარყოფილია',
+  'უარყოფილია, თანხმდება დაზღვევასთან',
 ];
 
 export function getTimestampMillis(value: any) {
