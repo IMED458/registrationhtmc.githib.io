@@ -20,8 +20,11 @@ type RequestMeta = {
 
 type RequestNotificationPayload = {
   body: string;
+  requestId: string;
   tag: string;
+  targetPath: string;
   title: string;
+  variant: 'registrar' | 'admin' | 'doctor';
 };
 
 export type InAppNotification = RequestNotificationPayload & {
@@ -46,6 +49,78 @@ function getNotificationPermission(): NotificationPermissionState {
 
 function getPatientFullName(request: ClinicalRequest) {
   return `${request.patientData.lastName} ${request.patientData.firstName}`.trim() || 'უცნობი პაციენტი';
+}
+
+function getRequestTargetPath(requestId: string) {
+  return `/request/${requestId}`;
+}
+
+function getNotificationTargetUrl(targetPath: string) {
+  if (typeof window === 'undefined') {
+    return targetPath;
+  }
+
+  if (window.location.hostname.endsWith('github.io')) {
+    return `${window.location.origin}/registrationhtmc.githib.io/docs/#${targetPath}`;
+  }
+
+  return `${window.location.origin}${targetPath}`;
+}
+
+function navigateToNotificationTarget(targetPath: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const targetUrl = getNotificationTargetUrl(targetPath);
+  window.focus();
+
+  if (window.location.href !== targetUrl) {
+    window.location.href = targetUrl;
+  }
+}
+
+function playInAppAlertTone(variant: RequestNotificationPayload['variant']) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+  if (!AudioContextConstructor) {
+    return;
+  }
+
+  try {
+    const audioContext = new AudioContextConstructor();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const frequencyByVariant: Record<RequestNotificationPayload['variant'], number> = {
+      registrar: 740,
+      admin: 620,
+      doctor: 880,
+    };
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequencyByVariant[variant];
+    gainNode.gain.value = 0.0001;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    const now = audioContext.currentTime;
+    gainNode.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.24);
+
+    oscillator.onended = () => {
+      void audioContext.close().catch(() => {});
+    };
+  } catch (error) {
+    console.warn('In-app alert tone skipped:', error);
+  }
 }
 
 function getRequestSummary(request: ClinicalRequest) {
@@ -78,7 +153,10 @@ function buildRegistrarNotification(request: ClinicalRequest): RequestNotificati
   return {
     title: 'ახალი მოთხოვნა',
     body: `${patientFullName} • ${summary} • გამომგზავნი: ${sender}`,
+    requestId: request.id,
     tag: `registrar-request-${request.id}-${request.createdAt?.seconds ?? 'now'}`,
+    targetPath: getRequestTargetPath(request.id),
+    variant: 'registrar',
   };
 }
 
@@ -93,7 +171,10 @@ function buildAdminNotification(request: ClinicalRequest): RequestNotificationPa
   return {
     title: 'ახალი დადასტურება',
     body: `${patientFullName} • ცვლილება ელოდება დადასტურებას • ${requestedBy}`,
+    requestId: request.id,
     tag: `admin-approval-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
+    targetPath: getRequestTargetPath(request.id),
+    variant: 'admin',
   };
 }
 
@@ -112,7 +193,10 @@ function buildDoctorStatusNotification(request: ClinicalRequest): RequestNotific
   return {
     title: 'პაციენტის სტატუსი განახლდა',
     body: `${patientFullName} • ${statusSummary}`,
+    requestId: request.id,
     tag: `doctor-status-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
+    targetPath: getRequestTargetPath(request.id),
+    variant: 'doctor',
   };
 }
 
@@ -254,6 +338,8 @@ export function useRequestNotifications({
             if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
               navigator.vibrate?.([120, 60, 120]);
             }
+
+            playInAppAlertTone(nextToastNotifications[0]?.variant || 'doctor');
           }
 
           return;
@@ -268,13 +354,17 @@ export function useRequestNotifications({
 
           const notification = new window.Notification(payload.title, {
             body: payload.body,
+            data: {
+              requestId: payload.requestId,
+              targetPath: payload.targetPath,
+            },
             icon: NOTIFICATION_ICON_URL,
             badge: NOTIFICATION_ICON_URL,
             tag: payload.tag,
           });
 
           notification.onclick = () => {
-            window.focus();
+            navigateToNotificationTarget(payload.targetPath);
             notification.close();
           };
 

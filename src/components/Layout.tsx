@@ -5,11 +5,43 @@ import { useAuth } from '../AuthContext';
 import { auth, db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useArchiveMaintenance } from '../useArchiveMaintenance';
-import { useRequestNotifications } from '../useRequestNotifications';
-import { Archive, BellRing, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User, X } from 'lucide-react';
+import { InAppNotification, useRequestNotifications } from '../useRequestNotifications';
+import { Archive, BellRing, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, ShieldCheck, Stethoscope, User, X } from 'lucide-react';
 import { ClinicalRequest } from '../types';
 
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
+
+function getInAppNotificationStyles(notification: InAppNotification) {
+  switch (notification.variant) {
+    case 'registrar':
+      return {
+        cardClassName: 'border-emerald-300 bg-emerald-50/95 shadow-emerald-200/70',
+        badgeClassName: 'bg-emerald-100 text-emerald-700',
+        titleClassName: 'text-emerald-950',
+        bodyClassName: 'text-emerald-900/85',
+        accentClassName: 'bg-emerald-500',
+        Icon: ClipboardList,
+      };
+    case 'admin':
+      return {
+        cardClassName: 'border-amber-300 bg-amber-50/95 shadow-amber-200/70',
+        badgeClassName: 'bg-amber-100 text-amber-700',
+        titleClassName: 'text-amber-950',
+        bodyClassName: 'text-amber-900/85',
+        accentClassName: 'bg-amber-500',
+        Icon: ShieldCheck,
+      };
+    default:
+      return {
+        cardClassName: 'border-sky-300 bg-sky-50/95 shadow-sky-200/70',
+        badgeClassName: 'bg-sky-100 text-sky-700',
+        titleClassName: 'text-sky-950',
+        bodyClassName: 'text-sky-900/85',
+        accentClassName: 'bg-sky-500',
+        Icon: Stethoscope,
+      };
+  }
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { profile, isAdmin, canCreateRequests, canAccessRequestsModule, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
@@ -114,6 +146,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     await auth.signOut();
     navigate('/login');
+  };
+
+  const handleNotificationOpen = (notification: InAppNotification) => {
+    dismissInAppNotification(notification.id);
+    navigate(notification.targetPath);
   };
 
   return (
@@ -273,26 +310,46 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {inAppNotifications.length > 0 && (
         <div className="pointer-events-none fixed inset-x-3 top-20 z-[60] flex flex-col gap-3 sm:right-6 sm:left-auto sm:w-full sm:max-w-sm">
-          {inAppNotifications.map((notification) => (
+          {inAppNotifications.map((notification) => {
+            const styles = getInAppNotificationStyles(notification);
+            const Icon = styles.Icon;
+
+            return (
             <div
               key={notification.id}
-              className="pointer-events-auto rounded-2xl border border-sky-200 bg-white/95 p-4 shadow-xl backdrop-blur"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleNotificationOpen(notification)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleNotificationOpen(notification);
+                }
+              }}
+              className={`pointer-events-auto relative overflow-hidden rounded-2xl border p-4 text-left shadow-2xl backdrop-blur transition hover:scale-[1.01] hover:shadow-2xl ${styles.cardClassName}`}
             >
+              <span className={`absolute inset-y-0 left-0 w-1.5 ${styles.accentClassName}`} />
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-full bg-sky-100 p-2 text-sky-700">
-                  <BellRing className="h-4 w-4" />
+                <div className={`mt-0.5 rounded-full p-2 ${styles.badgeClassName}`}>
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-black text-slate-900">
+                  <div className={`text-sm font-black ${styles.titleClassName}`}>
                     {notification.title}
                   </div>
-                  <div className="mt-1 text-sm leading-5 text-slate-600">
+                  <div className={`mt-1 text-sm leading-5 ${styles.bodyClassName}`}>
                     {notification.body}
+                  </div>
+                  <div className="mt-2 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                    შეეხე და გახსენი პაციენტის ჩანაწერი
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => dismissInAppNotification(notification.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    dismissInAppNotification(notification.id);
+                  }}
                   className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                   title="დახურვა"
                 >
@@ -300,7 +357,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 
