@@ -526,6 +526,7 @@ export default function RequestDetailsPage() {
       currentStatus: resolveRequestStatus(
         current.currentStatus as ClinicalRequest['currentStatus'],
         current.requestedAction,
+        current.department,
         nextFinalDecision,
       ),
     }));
@@ -576,6 +577,7 @@ export default function RequestDetailsPage() {
       const resolvedCurrentStatus = resolveRequestStatus(
         formData.currentStatus as ClinicalRequest['currentStatus'],
         formData.requestedAction,
+        formData.department,
         formData.finalDecision,
       );
 

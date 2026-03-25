@@ -24,12 +24,14 @@ export function normalizeRequestStatus(status?: string | null) {
 export function resolveRequestStatus(
   currentStatus: RequestStatus,
   requestedAction?: string | null,
+  department?: string | null,
   finalDecision?: string | null,
 ) {
   const normalizedRequestedAction = String(requestedAction || '').trim();
+  const normalizedDepartment = String(department || '').trim();
   const normalizedFinalDecision = String(finalDecision || '').trim();
 
-  if (normalizedRequestedAction === 'სტაციონარი') {
+  if (normalizedRequestedAction === 'სტაციონარი' || normalizedDepartment) {
     return 'დასრულებულია' as RequestStatus;
   }
 
@@ -40,17 +42,18 @@ export function resolveRequestStatusFromFinalDecision(
   currentStatus: RequestStatus,
   finalDecision?: string | null,
 ) {
-  return resolveRequestStatus(currentStatus, '', finalDecision);
+  return resolveRequestStatus(currentStatus, '', '', finalDecision);
 }
 
 export function resolveRequestStatusFromRequest(
-  request: Pick<ClinicalRequest, 'currentStatus' | 'requestedAction' | 'finalDecision'>,
+  request: Pick<ClinicalRequest, 'currentStatus' | 'requestedAction' | 'department' | 'finalDecision'>,
 ) {
   const normalizedCurrentStatus = normalizeRequestStatus(request.currentStatus || '') || 'ახალი';
 
   return resolveRequestStatus(
     normalizedCurrentStatus as RequestStatus,
     request.requestedAction,
+    request.department,
     request.finalDecision,
   );
 }

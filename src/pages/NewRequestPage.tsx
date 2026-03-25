@@ -495,7 +495,7 @@ export default function NewRequestPage() {
         icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
         diagnoses,
         doctorComment: formData.doctorComment,
-        currentStatus: resolveRequestStatus('ახალი', formData.requestedAction, ''),
+        currentStatus: resolveRequestStatus('ახალი', formData.requestedAction, formData.department, ''),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
