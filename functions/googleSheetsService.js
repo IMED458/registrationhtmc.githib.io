@@ -392,14 +392,14 @@ function mapPatientFromSheet(rows, settings, historyNumber, personalId) {
 
   const headers = rows[0];
   const dataRows = rows.slice(1);
-  const firstNameIndex = findColumnIndex(headers, settings.columnMapping.firstName);
-  const lastNameIndex = findColumnIndex(headers, settings.columnMapping.lastName);
-  const historyNumberIndex = findColumnIndex(headers, settings.columnMapping.historyNumber);
-  const personalIdIndex = findColumnIndex(headers, settings.columnMapping.personalId);
-  const birthDateIndex = findColumnIndex(headers, settings.columnMapping.birthDate);
-  const insuranceIndex = findColumnIndex(headers, settings.columnMapping.insurance);
-  const phoneIndex = findColumnIndex(headers, settings.columnMapping.phone);
-  const addressIndex = findColumnIndex(headers, settings.columnMapping.address);
+  const firstNameIndex = resolveColumnIndex(rows, settings.columnMapping.firstName || 'C');
+  const lastNameIndex = resolveColumnIndex(rows, settings.columnMapping.lastName || 'B');
+  const historyNumberIndex = resolveColumnIndex(rows, settings.columnMapping.historyNumber || 'F');
+  const personalIdIndex = resolveColumnIndex(rows, settings.columnMapping.personalId || 'D');
+  const birthDateIndex = resolveColumnIndex(rows, settings.columnMapping.birthDate);
+  const insuranceIndex = resolveColumnIndex(rows, settings.columnMapping.insurance || 'E');
+  const phoneIndex = resolveColumnIndex(rows, settings.columnMapping.phone);
+  const addressIndex = resolveColumnIndex(rows, settings.columnMapping.address);
 
   const normalizedHistoryNumber = normalizeLookupValue(historyNumber);
   const normalizedPersonalId = normalizeLookupValue(personalId);
