@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { resolveUserDisplayName } from './accessControl';
 import { isArchivedRequest } from './archiveUtils';
 import { db } from './firebase';
+import { normalizeRequestStatus, resolveRequestStatusFromRequest } from './requestStatusUtils';
 import { ClinicalRequest, UserProfile } from './types';
 
 const APP_TITLE = 'კლინიკის მართვის სისტემა';
@@ -11,7 +12,9 @@ const NOTIFICATION_ICON_URL = `${import.meta.env.BASE_URL}favicon-32x32.png?v=20
 type NotificationPermissionState = NotificationPermission | 'unsupported';
 
 type RequestMeta = {
+  finalDecision: string;
   hasPendingApproval: boolean;
+  status: string;
 };
 
 type RequestNotificationPayload = {
@@ -89,6 +92,25 @@ function buildAdminNotification(request: ClinicalRequest): RequestNotificationPa
   };
 }
 
+function requestBelongsToCurrentUser(request: ClinicalRequest, profile: UserProfile) {
+  return request.createdByUserId === profile.uid || request.createdByUserEmail === profile.email;
+}
+
+function buildDoctorStatusNotification(request: ClinicalRequest): RequestNotificationPayload {
+  const patientFullName = getPatientFullName(request);
+  const resolvedStatus = normalizeRequestStatus(resolveRequestStatusFromRequest(request));
+  const finalDecision = (request.finalDecision || '').trim();
+  const statusSummary = finalDecision
+    ? `სტატუსი: ${resolvedStatus} • გადაწყვეტილება: ${finalDecision}`
+    : `სტატუსი: ${resolvedStatus}`;
+
+  return {
+    title: 'პაციენტის სტატუსი განახლდა',
+    body: `${patientFullName} • ${statusSummary}`,
+    tag: `doctor-status-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
+  };
+}
+
 function isPendingAdminConfirmation(request: ClinicalRequest) {
   return request.adminConfirmationStatus === 'pending' &&
     Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
@@ -96,6 +118,7 @@ function isPendingAdminConfirmation(request: ClinicalRequest) {
 
 type UseRequestNotificationsOptions = {
   isAdmin: boolean;
+  isDoctorOrNurse: boolean;
   isRegistrar: boolean;
   profile: UserProfile | null;
 };
@@ -103,6 +126,7 @@ type UseRequestNotificationsOptions = {
 export function useRequestNotifications({
   profile,
   isAdmin,
+  isDoctorOrNurse,
   isRegistrar,
 }: UseRequestNotificationsOptions) {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() => getNotificationPermission());
@@ -148,7 +172,7 @@ export function useRequestNotifications({
     previousRequestsRef.current = new Map();
     hasHydratedSnapshotRef.current = false;
 
-    if (!profile || !db || (!isRegistrar && !isAdmin)) {
+    if (!profile || !db || (!isRegistrar && !isAdmin && !isDoctorOrNurse)) {
       return;
     }
 
@@ -166,7 +190,9 @@ export function useRequestNotifications({
           }
 
           const meta: RequestMeta = {
+            finalDecision: (request.finalDecision || '').trim(),
             hasPendingApproval: isPendingAdminConfirmation(request),
+            status: normalizeRequestStatus(resolveRequestStatusFromRequest(request)),
           };
 
           nextRequests.set(request.id, meta);
@@ -184,6 +210,19 @@ export function useRequestNotifications({
 
           if (isAdmin && meta.hasPendingApproval && !previousRequest?.hasPendingApproval) {
             queuedNotifications.push(buildAdminNotification(request));
+            return;
+          }
+
+          if (
+            isDoctorOrNurse &&
+            requestBelongsToCurrentUser(request, profile) &&
+            previousRequest &&
+            (
+              previousRequest.status !== meta.status ||
+              previousRequest.finalDecision !== meta.finalDecision
+            )
+          ) {
+            queuedNotifications.push(buildDoctorStatusNotification(request));
           }
         });
 
@@ -226,7 +265,7 @@ export function useRequestNotifications({
     );
 
     return unsubscribe;
-  }, [isAdmin, isRegistrar, notificationPermission, profile]);
+  }, [isAdmin, isDoctorOrNurse, isRegistrar, notificationPermission, profile]);
 
   const requestNotificationPermission = async () => {
     if (!supportsBrowserNotifications()) {
@@ -239,7 +278,7 @@ export function useRequestNotifications({
 
     if (permission === 'granted') {
       const notification = new window.Notification('შეტყობინებები ჩართულია', {
-        body: 'ახლა ახალი მოთხოვნა ან დასადასტურებელი ცვლილება ბრაუზერში შეგახსენდება.',
+        body: 'ახლა ახალი მოთხოვნა, სტატუსის ცვლილება ან დასადასტურებელი ჩანაწერი ბრაუზერში შეგახსენდება.',
         icon: NOTIFICATION_ICON_URL,
         badge: NOTIFICATION_ICON_URL,
         tag: 'notifications-enabled',

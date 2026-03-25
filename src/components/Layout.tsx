@@ -12,7 +12,7 @@ import { ClinicalRequest } from '../types';
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, canCreateRequests, canAccessRequestsModule, canAccessAdminPanel, isRegistrar } = useAuth();
+  const { profile, isAdmin, canCreateRequests, canAccessRequestsModule, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
@@ -33,12 +33,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   } = useRequestNotifications({
     profile,
     isAdmin,
+    isDoctorOrNurse,
     isRegistrar,
   });
 
   const shouldShowNotificationButton =
     supportsNotifications &&
-    (isAdmin || isRegistrar) &&
+    (isAdmin || isRegistrar || isDoctorOrNurse) &&
     notificationPermission !== 'granted';
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={requestNotificationPermission}
-                  className="hidden items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 lg:inline-flex"
+                  className="hidden items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 sm:inline-flex"
                   title="ბრაუზერის შეტყობინებების ჩართვა"
                 >
                   <BellRing className="h-4 w-4" />
