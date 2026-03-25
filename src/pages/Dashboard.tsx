@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { Timestamp, collection, deleteDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
@@ -135,6 +135,15 @@ function needsRegistrarRework(request: ClinicalRequest) {
   return Boolean(request.requiresRegistrarAction && request.pendingDoctorEdit);
 }
 
+const REGISTRAR_COMPLETION_FINAL_DECISIONS = new Set([
+  'პაციენტი გაუშვით ბინაზე',
+  'პაციენტი დაწვეს კლინიკაში / სტაციონარში',
+]);
+
+function canRegistrarCompleteRequest(request: ClinicalRequest) {
+  return REGISTRAR_COMPLETION_FINAL_DECISIONS.has((request.finalDecision || '').trim());
+}
+
 function getPatientNameTextClass(request: ClinicalRequest) {
   return needsRegistrarRework(request) || hasDoctorEditPendingApproval(request)
     ? 'text-sky-600'
@@ -189,13 +198,14 @@ function DiagnosisList({ request }: { request: ClinicalRequest }) {
 }
 
 export default function Dashboard() {
-  const { profile, isDoctorOrNurse, isAdmin } = useAuth();
+  const { profile, isDoctorOrNurse, isAdmin, isRegistrar } = useAuth();
   const [requests, setRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestsError, setRequestsError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ყველა');
   const [deletingRequestId, setDeletingRequestId] = useState('');
+  const [completingRequestId, setCompletingRequestId] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
 
@@ -322,6 +332,48 @@ export default function Dashboard() {
       );
     } finally {
       setDeletingRequestId('');
+    }
+  };
+
+  const handleMarkRequestCompleted = async (request: ClinicalRequest) => {
+    if (!isRegistrar || !profile || !db || completingRequestId || request.currentStatus === 'დასრულებულია') {
+      return;
+    }
+
+    if (!canRegistrarCompleteRequest(request)) {
+      return;
+    }
+
+    setCompletingRequestId(request.id);
+    setFeedbackMessage('');
+
+    try {
+      await updateDoc(doc(db, 'requests', request.id), {
+        currentStatus: 'დასრულებულია',
+        updatedAt: Timestamp.now(),
+      });
+
+      await writeAuditLogEntry({
+        userId: profile.uid,
+        userName: profile.fullName,
+        requestId: request.id,
+        actionType: 'MARK_COMPLETED',
+        oldValue: `${request.currentStatus}${request.finalDecision ? ` / ${request.finalDecision}` : ''}`,
+        newValue: `დასრულებულია${request.finalDecision ? ` / ${request.finalDecision}` : ''}`,
+      });
+
+      setFeedbackMessage('ჩანაწერი წარმატებით გადავიდა დასრულებულში.');
+    } catch (error) {
+      console.error('Complete request error:', error);
+      alert(
+        getFirebaseActionErrorMessage(error, {
+          fallback: 'ჩანაწერის დასრულება ვერ მოხერხდა.',
+          permissionDenied:
+            'დასრულებულში გადატანა ვერ მოხერხდა, რადგან ამ ანგარიშისთვის write წვდომა არ არის ნებადართული.',
+        }),
+      );
+    } finally {
+      setCompletingRequestId('');
     }
   };
 
@@ -500,6 +552,23 @@ export default function Dashboard() {
                   </button>
                 )}
               </div>
+              {isRegistrar && canRegistrarCompleteRequest(req) && (
+                <label className="mt-3 inline-flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    checked={req.currentStatus === 'დასრულებულია'}
+                    disabled={req.currentStatus === 'დასრულებულია' || completingRequestId === req.id}
+                    onChange={() => handleMarkRequestCompleted(req)}
+                  />
+                  <span>
+                    {req.currentStatus === 'დასრულებულია'
+                      ? 'დასრულებულია'
+                      : 'დასრულებულში გადატანა'}
+                  </span>
+                  {completingRequestId === req.id && <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />}
+                </label>
+              )}
             </div>
           ))
         )}
@@ -600,7 +669,25 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex flex-col items-end gap-3">
+                        {isRegistrar && canRegistrarCompleteRequest(req) && (
+                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              checked={req.currentStatus === 'დასრულებულია'}
+                              disabled={req.currentStatus === 'დასრულებულია' || completingRequestId === req.id}
+                              onChange={() => handleMarkRequestCompleted(req)}
+                            />
+                            <span>
+                              {req.currentStatus === 'დასრულებულია'
+                                ? 'დასრულებულია'
+                                : 'დასრულებულში'}
+                            </span>
+                            {completingRequestId === req.id && <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />}
+                          </label>
+                        )}
+                        <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => navigate(`/request/${req.id}`)}
                           className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
@@ -629,6 +716,7 @@ export default function Dashboard() {
                             )}
                           </button>
                         )}
+                        </div>
                       </div>
                     </td>
                   </tr>
