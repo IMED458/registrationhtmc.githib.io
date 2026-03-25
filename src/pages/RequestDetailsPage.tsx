@@ -4,7 +4,7 @@ import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
-import { resolveRequestStatusFromFinalDecision } from '../requestStatusUtils';
+import { normalizeRequestStatus, resolveRequestStatusFromFinalDecision } from '../requestStatusUtils';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
@@ -199,7 +199,7 @@ function buildFormDataFromRequest(
     consentStatus: data?.consentStatus || '',
     doctorComment: data?.doctorComment || '',
     diagnoses: diagnosisRows.length ? diagnosisRows : [createDiagnosisFormRow({ isPrimary: true })],
-    currentStatus: data?.currentStatus || '',
+    currentStatus: normalizeRequestStatus(data?.currentStatus || ''),
     finalDecision: data?.finalDecision || '',
     registrarComment: data?.registrarComment || '',
     registrarName: data?.registrarName || profileFullName || '',
@@ -357,7 +357,7 @@ export default function RequestDetailsPage() {
 
   const statusOptions = Array.from(
     new Set([
-      ...REQUEST_STATUSES.filter((status) => status !== 'უარყოფილია'),
+      ...REQUEST_STATUSES,
       ...(formData.currentStatus ? [formData.currentStatus] : []),
     ]),
   );
@@ -1797,7 +1797,7 @@ export default function RequestDetailsPage() {
                 <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   <div>
                     <div className="text-xs font-bold uppercase text-amber-700">ახალი სტატუსი</div>
-                    <div className="mt-1 font-bold text-slate-900">{pendingUpdate.currentStatus}</div>
+                    <div className="mt-1 font-bold text-slate-900">{normalizeRequestStatus(pendingUpdate.currentStatus)}</div>
                   </div>
                   <div>
                     <div className="text-xs font-bold uppercase text-amber-700">საბოლოო გადაწყვეტილება</div>

@@ -9,6 +9,7 @@ import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { ClinicalRequest } from '../types';
+import { normalizeRequestStatus } from '../requestStatusUtils';
 import {
   ARCHIVE_RETENTION_MS,
   getArchiveGroupKey,
@@ -102,7 +103,7 @@ export default function ArchivePage() {
         userName: profile.fullName,
         requestId: request.id,
         actionType: 'DELETE',
-        oldValue: `არქივი / ${request.currentStatus}${request.finalDecision ? ` / ${request.finalDecision}` : ''}`,
+        oldValue: `არქივი / ${normalizeRequestStatus(request.currentStatus)}${request.finalDecision ? ` / ${request.finalDecision}` : ''}`,
         newValue: `არქივიდან წაიშალა მოთხოვნა: ${request.patientData.firstName} ${request.patientData.lastName}`,
       });
     } catch (error) {
@@ -129,7 +130,7 @@ export default function ArchivePage() {
       request.patientData.lastName.toLowerCase().includes(normalizedSearch) ||
       request.patientData.historyNumber.toLowerCase().includes(normalizedSearch) ||
       request.patientData.personalId.toLowerCase().includes(normalizedSearch) ||
-      request.currentStatus.toLowerCase().includes(normalizedSearch) ||
+      normalizeRequestStatus(request.currentStatus).toLowerCase().includes(normalizedSearch) ||
       (request.finalDecision || '').toLowerCase().includes(normalizedSearch) ||
       getDiagnosisSearchText(request).toLowerCase().includes(normalizedSearch) ||
       getStudyTypeSummary(request).toLowerCase().includes(normalizedSearch)
@@ -226,7 +227,7 @@ export default function ArchivePage() {
 
                             <div className="flex flex-wrap gap-2">
                               <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-                                {request.currentStatus}
+                                {normalizeRequestStatus(request.currentStatus)}
                               </span>
                               {request.finalDecision && (
                                 <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">

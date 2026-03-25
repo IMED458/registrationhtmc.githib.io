@@ -25,7 +25,7 @@ export type RequestStatus =
   | 'დადასტურებულია'
   | 'დასრულებულია'
   | 'უარყოფილია'
-  | 'უარყოფილია, თანხმდება დაზღვევასთან';
+  | 'თანხმდება დაზღვევასთან';
 export type AdminConfirmationStatus = 'pending' | 'confirmed';
 
 export interface DiagnosisEntry {

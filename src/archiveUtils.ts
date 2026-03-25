@@ -1,4 +1,5 @@
 import { ClinicalRequest, RequestStatus } from './types';
+import { INSURANCE_APPROVAL_STATUS, normalizeRequestStatus } from './requestStatusUtils';
 
 export const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000;
 export const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -8,7 +9,7 @@ const ARCHIVE_READY_STATUSES: RequestStatus[] = [
   'დადასტურებულია',
   'დასრულებულია',
   'უარყოფილია',
-  'უარყოფილია, თანხმდება დაზღვევასთან',
+  INSURANCE_APPROVAL_STATUS,
 ];
 
 export function getTimestampMillis(value: any) {
@@ -33,8 +34,8 @@ export function getTimestampMillis(value: any) {
   return 0;
 }
 
-export function isArchiveEligibleStatus(status: RequestStatus) {
-  return ARCHIVE_READY_STATUSES.includes(status);
+export function isArchiveEligibleStatus(status: RequestStatus | string) {
+  return ARCHIVE_READY_STATUSES.includes(normalizeRequestStatus(status) as RequestStatus);
 }
 
 export function getRequestLastActivityMillis(request: ClinicalRequest) {

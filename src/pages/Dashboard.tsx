@@ -7,6 +7,7 @@ import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getFinalDecisionTextClass } from '../finalDecisionStyles';
 import { getDiagnosisEntries, getDiagnosisSearchText, normalizeIcdCode } from '../icd10Utils';
+import { normalizeRequestStatus } from '../requestStatusUtils';
 import { getStudyTypeSummary } from '../studyTypeUtils';
 import { isArchivedRequest } from '../archiveUtils';
 import { ClinicalRequest, RequestStatus } from '../types';
@@ -208,6 +209,7 @@ export default function Dashboard() {
   const [completingRequestId, setCompletingRequestId] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const navigate = useNavigate();
+  const getDisplayStatus = (request: ClinicalRequest) => normalizeRequestStatus(request.currentStatus);
 
   useEffect(() => {
     if (!profile) {
@@ -261,33 +263,33 @@ export default function Dashboard() {
         .join(' ')
         .includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'ყველა' || req.currentStatus === statusFilter;
+    const matchesStatus = statusFilter === 'ყველა' || getDisplayStatus(req) === statusFilter;
     
     return matchesSearch && matchesStatus;
   });
 
   const getStatusColor = (status: RequestStatus) => {
-    switch (status) {
+    switch (normalizeRequestStatus(status)) {
       case 'ახალი': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'განხილვაშია': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'მიღებულია': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
       case 'დადასტურებულია': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'დასრულებულია': return 'bg-slate-100 text-slate-700 border-slate-200';
       case 'უარყოფილია': return 'bg-red-100 text-red-700 border-red-200';
-      case 'უარყოფილია, თანხმდება დაზღვევასთან': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'თანხმდება დაზღვევასთან': return 'bg-orange-100 text-orange-700 border-orange-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
   const getStatusIcon = (status: RequestStatus) => {
-    switch (status) {
+    switch (normalizeRequestStatus(status)) {
       case 'ახალი': return <Clock className="w-4 h-4" />;
       case 'განხილვაშია': return <MoreHorizontal className="w-4 h-4" />;
       case 'მიღებულია': return <CheckCircle2 className="w-4 h-4" />;
       case 'დადასტურებულია': return <CheckCircle2 className="w-4 h-4" />;
       case 'დასრულებულია': return <CheckCircle2 className="w-4 h-4" />;
       case 'უარყოფილია': return <XCircle className="w-4 h-4" />;
-      case 'უარყოფილია, თანხმდება დაზღვევასთან': return <XCircle className="w-4 h-4" />;
+      case 'თანხმდება დაზღვევასთან': return <XCircle className="w-4 h-4" />;
       default: return null;
     }
   };
@@ -336,7 +338,7 @@ export default function Dashboard() {
   };
 
   const handleMarkRequestCompleted = async (request: ClinicalRequest) => {
-    if (!isRegistrar || !profile || !db || completingRequestId || request.currentStatus === 'დასრულებულია') {
+    if (!isRegistrar || !profile || !db || completingRequestId || getDisplayStatus(request) === 'დასრულებულია') {
       return;
     }
 
@@ -470,7 +472,7 @@ export default function Dashboard() {
                   getStatusColor(req.currentStatus)
                 )}>
                   {getStatusIcon(req.currentStatus)}
-                  {req.currentStatus}
+                  {getDisplayStatus(req)}
                 </span>
               </div>
 
@@ -557,12 +559,12 @@ export default function Dashboard() {
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    checked={req.currentStatus === 'დასრულებულია'}
-                    disabled={req.currentStatus === 'დასრულებულია' || completingRequestId === req.id}
+                    checked={getDisplayStatus(req) === 'დასრულებულია'}
+                    disabled={getDisplayStatus(req) === 'დასრულებულია' || completingRequestId === req.id}
                     onChange={() => handleMarkRequestCompleted(req)}
                   />
                   <span>
-                    {req.currentStatus === 'დასრულებულია'
+                    {getDisplayStatus(req) === 'დასრულებულია'
                       ? 'დასრულებულია'
                       : 'დასრულებულში გადატანა'}
                   </span>
@@ -649,7 +651,7 @@ export default function Dashboard() {
                           getStatusColor(req.currentStatus)
                         )}>
                           {getStatusIcon(req.currentStatus)}
-                          {req.currentStatus}
+                          {getDisplayStatus(req)}
                         </span>
                         {req.finalDecision && (
                           <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
@@ -675,12 +677,12 @@ export default function Dashboard() {
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                              checked={req.currentStatus === 'დასრულებულია'}
-                              disabled={req.currentStatus === 'დასრულებულია' || completingRequestId === req.id}
+                              checked={getDisplayStatus(req) === 'დასრულებულია'}
+                              disabled={getDisplayStatus(req) === 'დასრულებულია' || completingRequestId === req.id}
                               onChange={() => handleMarkRequestCompleted(req)}
                             />
                             <span>
-                              {req.currentStatus === 'დასრულებულია'
+                              {getDisplayStatus(req) === 'დასრულებულია'
                                 ? 'დასრულებულია'
                                 : 'დასრულებულში'}
                             </span>

@@ -3,6 +3,7 @@ import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc, Tim
 import { REGISTRAR_EMAIL } from '../accessControl';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { normalizeRequestStatus } from '../requestStatusUtils';
 import { writeAuditLogEntry } from '../auditLog';
 import { DEFAULT_SYSTEM_SETTINGS, normalizeSystemSettings } from '../defaultSystemSettings';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
@@ -348,7 +349,7 @@ export default function AdminSettingsPage() {
                             {request.patientData.historyNumber} / {request.patientData.personalId}
                           </div>
                           <div className="text-sm font-bold text-amber-800">
-                            {request.currentStatus}
+                            {normalizeRequestStatus(request.currentStatus)}
                             {request.finalDecision ? ` / ${request.finalDecision}` : ''}
                           </div>
                           <div className="text-sm text-slate-700">

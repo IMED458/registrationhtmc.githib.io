@@ -3,6 +3,7 @@ import { collection, doc, limit, onSnapshot, orderBy, query, Timestamp, updateDo
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { normalizeRequestStatus } from '../requestStatusUtils';
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { isArchivedRequest } from '../archiveUtils';
@@ -157,7 +158,7 @@ export default function AdminRequestsPage() {
                     <div>
                       <div className="text-xs font-bold uppercase text-amber-700">მიმდინარე სტატუსი</div>
                       <div className="mt-1 font-bold text-slate-900">
-                        {request.pendingRegistrarUpdate?.currentStatus || request.currentStatus}
+                        {normalizeRequestStatus(request.pendingRegistrarUpdate?.currentStatus || request.currentStatus)}
                       </div>
                     </div>
                     <div>
