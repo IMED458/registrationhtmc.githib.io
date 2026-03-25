@@ -6,7 +6,7 @@ import { auth, db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useArchiveMaintenance } from '../useArchiveMaintenance';
 import { useRequestNotifications } from '../useRequestNotifications';
-import { Archive, BellRing, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User } from 'lucide-react';
+import { Archive, BellRing, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, User, X } from 'lucide-react';
 import { ClinicalRequest } from '../types';
 
 const SIDEBAR_STORAGE_KEY = 'registrationhtmc.sidebar-collapsed';
@@ -27,6 +27,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useArchiveMaintenance(Boolean(profile));
 
   const {
+    dismissInAppNotification,
+    inAppNotifications,
     notificationPermission,
     requestNotificationPermission,
     supportsNotifications,
@@ -268,6 +270,39 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {inAppNotifications.length > 0 && (
+        <div className="pointer-events-none fixed inset-x-3 top-20 z-[60] flex flex-col gap-3 sm:right-6 sm:left-auto sm:w-full sm:max-w-sm">
+          {inAppNotifications.map((notification) => (
+            <div
+              key={notification.id}
+              className="pointer-events-auto rounded-2xl border border-sky-200 bg-white/95 p-4 shadow-xl backdrop-blur"
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-sky-100 p-2 text-sky-700">
+                  <BellRing className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-black text-slate-900">
+                    {notification.title}
+                  </div>
+                  <div className="mt-1 text-sm leading-5 text-slate-600">
+                    {notification.body}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dismissInAppNotification(notification.id)}
+                  className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  title="დახურვა"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
         <div

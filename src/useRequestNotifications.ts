@@ -24,6 +24,10 @@ type RequestNotificationPayload = {
   title: string;
 };
 
+export type InAppNotification = RequestNotificationPayload & {
+  id: string;
+};
+
 function supportsBrowserNotifications() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
@@ -132,6 +136,7 @@ export function useRequestNotifications({
 }: UseRequestNotificationsOptions) {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() => getNotificationPermission());
   const [backgroundNotificationCount, setBackgroundNotificationCount] = useState(0);
+  const [inAppNotifications, setInAppNotifications] = useState<InAppNotification[]>([]);
   const previousRequestsRef = useRef<Map<string, RequestMeta>>(new Map());
   const hasHydratedSnapshotRef = useRef(false);
 
@@ -235,6 +240,22 @@ export function useRequestNotifications({
         }
 
         if (!queuedNotifications.length || !isPageInBackground()) {
+          if (queuedNotifications.length && !isPageInBackground()) {
+            const nextToastNotifications = queuedNotifications.map((payload, index) => ({
+              ...payload,
+              id: `${payload.tag}-${Date.now()}-${index}`,
+            }));
+
+            setInAppNotifications((current) => [
+              ...nextToastNotifications,
+              ...current,
+            ].slice(0, 4));
+
+            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+              navigator.vibrate?.([120, 60, 120]);
+            }
+          }
+
           return;
         }
 
@@ -267,6 +288,20 @@ export function useRequestNotifications({
 
     return unsubscribe;
   }, [isAdmin, isDoctorOrNurse, isRegistrar, notificationPermission, profile]);
+
+  useEffect(() => {
+    if (!inAppNotifications.length) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setInAppNotifications((current) => current.slice(0, -1));
+    }, 7000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [inAppNotifications]);
 
   useEffect(() => {
     if (!profile) {
@@ -304,6 +339,10 @@ export function useRequestNotifications({
 
   return {
     backgroundNotificationCount,
+    dismissInAppNotification: (id: string) => {
+      setInAppNotifications((current) => current.filter((notification) => notification.id !== id));
+    },
+    inAppNotifications,
     notificationPermission,
     requestNotificationPermission,
     supportsNotifications: supportsBrowserNotifications(),
