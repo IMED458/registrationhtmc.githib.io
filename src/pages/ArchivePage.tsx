@@ -16,7 +16,7 @@ import {
   getArchivedAtMillis,
   isArchivedRequest,
 } from '../archiveUtils';
-import { getDiagnosisSearchText } from '../icd10Utils';
+import { getDiagnosisEntries, getDiagnosisSearchText } from '../icd10Utils';
 import { getStudyTypeSummary } from '../studyTypeUtils';
 
 function formatArchiveDateLabel(dateValue: Date) {
@@ -30,6 +30,41 @@ function formatDateTimeLabel(timestamp: number) {
 function sortArchivedRequests(requests: ClinicalRequest[]) {
   return [...requests].sort(
     (left, right) => getArchivedAtMillis(right) - getArchivedAtMillis(left),
+  );
+}
+
+function ArchiveDiagnosisList({ request }: { request: ClinicalRequest }) {
+  const diagnosisEntries = getDiagnosisEntries(request);
+
+  if (!diagnosisEntries.length) {
+    return <div className="mt-1 text-sm leading-6 text-slate-700">-</div>;
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {diagnosisEntries.map((diagnosisEntry, index) => (
+        <div
+          key={`${diagnosisEntry.code || diagnosisEntry.description || 'diagnosis'}-${index}`}
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-bold text-slate-900">
+              {diagnosisEntry.code || diagnosisEntry.combined}
+            </div>
+            {diagnosisEntry.isPrimary && (
+              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-black text-sky-700">
+                წამყვანი
+              </span>
+            )}
+          </div>
+          {diagnosisEntry.description && (
+            <div className="mt-1 text-sm leading-6 text-slate-600">
+              {diagnosisEntry.description}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -287,9 +322,7 @@ export default function ArchivePage() {
                               </div>
                               <div>
                                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დიაგნოზი</div>
-                                <div className="mt-1 text-sm leading-6 text-slate-700">
-                                  {getDiagnosisSearchText(request) || '-'}
-                                </div>
+                                <ArchiveDiagnosisList request={request} />
                               </div>
                             </div>
 

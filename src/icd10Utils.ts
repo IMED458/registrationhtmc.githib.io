@@ -135,9 +135,19 @@ export function getRepresentativeDiagnosisEntry(value: DiagnosisValue) {
 }
 
 export function getDiagnosisSearchText(value: DiagnosisValue) {
+  const seenParts = new Set<string>();
+
   return getDiagnosisEntries(value)
     .flatMap((entry) => [entry.icdCode, entry.code, entry.diagnosis, entry.description, entry.combined])
-    .filter(Boolean)
+    .map((part) => String(part || '').trim())
+    .filter((part) => {
+      if (!part || seenParts.has(part)) {
+        return false;
+      }
+
+      seenParts.add(part);
+      return true;
+    })
     .join(' ')
     .trim();
 }
