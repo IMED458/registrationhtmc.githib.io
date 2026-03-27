@@ -8,6 +8,7 @@ import { resolveUserDisplayName } from '../accessControl';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } from '../icd10Lookup';
 import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
+import { buildRequestChangeSummary, getRequestActionLabel } from '../requestChangeUtils';
 import { resolveRequestStatus } from '../requestStatusUtils';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { getStudyTypes, sanitizeStudyTypes } from '../studyTypeUtils';
@@ -93,56 +94,6 @@ function buildFormDataFromRequest(request: ClinicalRequest) {
     doctorComment: request.doctorComment || '',
     senderName: request.formFillerName || request.createdByUserName || '',
   };
-}
-
-function getActionLabel(requestedAction: string, department: string) {
-  if (requestedAction === 'სტაციონარი') {
-    return department.trim() || 'სტაციონარი';
-  }
-
-  return requestedAction.trim() || '-';
-}
-
-function buildRegistrarEditSummary(
-  previousRequest: ClinicalRequest,
-  nextValues: {
-    requestedAction: string;
-    department: string;
-    diagnoses: DiagnosisEntry[];
-    consentStatus: string;
-  },
-) {
-  const summaryParts: string[] = [];
-  const previousAction = previousRequest.requestedAction;
-  const nextAction = nextValues.requestedAction;
-  const previousDepartment = previousRequest.department || '';
-  const nextDepartment = nextValues.department || '';
-  const previousDiagnosis = `${previousRequest.icdCode || ''} ${previousRequest.diagnosis || ''}`.trim();
-  const nextRepresentativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses: nextValues.diagnoses });
-  const nextDiagnosis = `${nextRepresentativeDiagnosis?.code || nextRepresentativeDiagnosis?.icdCode || ''} ${nextRepresentativeDiagnosis?.diagnosis || ''}`.trim();
-  const previousConsent = previousRequest.consentStatus || '';
-  const nextConsent = nextValues.consentStatus || '';
-
-  if (previousAction === 'ბინა' && nextAction === 'სტაციონარი') {
-    summaryParts.push(`ბინა განახლდა სტაციონარით${nextDepartment ? ` (${nextDepartment})` : ''}`);
-  } else if (previousAction === 'სტაციონარი' && nextAction === 'ბინა') {
-    summaryParts.push('სტაციონარი განახლდა ბინით');
-  } else if (
-    previousAction !== nextAction ||
-    (nextAction === 'სტაციონარი' && previousDepartment !== nextDepartment)
-  ) {
-    summaryParts.push(`მოქმედება შეიცვალა: ${getActionLabel(previousAction, previousDepartment)} -> ${getActionLabel(nextAction, nextDepartment)}`);
-  }
-
-  if (previousDiagnosis !== nextDiagnosis && nextDiagnosis) {
-    summaryParts.push(`დიაგნოზი განახლდა: ${nextDiagnosis}`);
-  }
-
-  if (previousConsent !== nextConsent) {
-    summaryParts.push(`თანხმობა/უარი განახლდა: ${nextConsent || '-'}`);
-  }
-
-  return summaryParts.join(' • ') || 'ჩანაწერი განახლდა';
 }
 
 export default function NewRequestPage() {
@@ -631,11 +582,19 @@ export default function NewRequestPage() {
       };
 
       if (isEditMode && existingRequest && editRequestId) {
-        const editSummary = buildRegistrarEditSummary(existingRequest, {
+        const editSummary = buildRequestChangeSummary(existingRequest, {
+          patientData: nextPatientData,
           requestedAction: formData.requestedAction,
           department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
-          diagnoses,
+          studyType: studyTypes.join(', '),
+          studyTypes,
           consentStatus: formData.consentStatus,
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          doctorComment: formData.doctorComment,
+          currentStatus: resolvedCurrentStatus,
+          finalDecision: existingRequest.finalDecision || '',
         });
 
         await updateDoc(doc(db, 'requests', editRequestId), {
@@ -676,8 +635,8 @@ export default function NewRequestPage() {
           userName: profile.fullName,
           requestId: editRequestId,
           actionType: 'FULL_EDIT',
-          oldValue: `${existingRequest.patientData.firstName} ${existingRequest.patientData.lastName} / ${existingRequest.requestedAction}`,
-          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getActionLabel(formData.requestedAction, formData.department)} / ${editSummary}`,
+          oldValue: `${existingRequest.patientData.firstName} ${existingRequest.patientData.lastName} / ${getRequestActionLabel(existingRequest.requestedAction, existingRequest.department)}`,
+          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getRequestActionLabel(formData.requestedAction, formData.department)} / ${editSummary}`,
         });
       } else {
         const requestData: Omit<ClinicalRequest, 'id'> = {

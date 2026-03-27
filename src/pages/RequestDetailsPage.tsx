@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { doc, getDoc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
@@ -8,9 +8,10 @@ import { normalizeRequestStatus, resolveRequestStatus, resolveRequestStatusFromR
 import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
+import { buildRequestChangeSummary, getRequestActionLabel } from '../requestChangeUtils';
 import { getStudyTypes } from '../studyTypeUtils';
 import { syncRequestToSheet } from '../syncRequestToSheet';
-import { ClinicalRequest, DiagnosisEntry, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
+import { AuditLog, ClinicalRequest, DiagnosisEntry, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Pencil, Plus, Printer, Save, Trash2, User, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -171,6 +172,28 @@ function getDateTimeLabel(value: any) {
     : '-';
 }
 
+function getAuditActionLabel(actionType: string) {
+  switch (actionType) {
+    case 'REGISTRAR_EDIT':
+      return 'რეგისტრატორმა შეცვალა';
+    case 'DOCTOR_EDIT':
+    case 'FULL_EDIT':
+      return 'ექიმმა / მენეჯერმა შეცვალა';
+    case 'ADMIN_FULL_EDIT':
+      return 'ადმინისტრატორმა შეცვალა';
+    case 'UPDATE':
+      return 'სტატუსი განახლდა';
+    case 'UPDATE_CONFIRMED':
+      return 'ადმინისტრატორმა დაადასტურა';
+    case 'AUTO_IN_REVIEW':
+      return 'განხილვაშია ავტომატურად ჩაიწერა';
+    case 'MARK_COMPLETED':
+      return 'დასრულებულში გადავიდა';
+    default:
+      return actionType;
+  }
+}
+
 function getDefaultFormFillerName(request?: ClinicalRequest | null, fallbackName?: string | null) {
   const senderName = resolveUserDisplayName(request?.createdByUserName, request?.createdByUserEmail);
 
@@ -229,6 +252,7 @@ export default function RequestDetailsPage() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [syncNoticeMessage, setSyncNoticeMessage] = useState('');
   const [formError, setFormError] = useState('');
+  const [historyLogs, setHistoryLogs] = useState<AuditLog[]>([]);
   const autoStatusSyncRef = useRef(false);
   const autoEditTriggeredRef = useRef(false);
 
@@ -399,6 +423,30 @@ export default function RequestDetailsPage() {
       document.removeEventListener('visibilitychange', refreshVisibleRequest);
     };
   }, [confirmAction, id, isEditing, profile?.fullName, updating]);
+
+  useEffect(() => {
+    if (!id) {
+      setHistoryLogs([]);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'), limit(200)),
+      (snapshot) => {
+        const nextLogs = snapshot.docs
+          .map((logDoc) => ({ id: logDoc.id, ...logDoc.data() } as AuditLog))
+          .filter((log) => log.requestId === id);
+
+        setHistoryLogs(nextLogs);
+      },
+      (error) => {
+        console.error('Request audit history sync failed:', error);
+        setHistoryLogs([]);
+      },
+    );
+
+    return unsubscribe;
+  }, [id]);
 
   useEffect(() => {
     if (!profile || (!isRegistrar && !isAdmin)) {
@@ -655,6 +703,22 @@ export default function RequestDetailsPage() {
       };
 
       if (isRegistrarOnly) {
+        const editSummary = buildRequestChangeSummary(request, {
+          patientData: request.patientData,
+          requestedAction: request.requestedAction,
+          department: request.department || '',
+          studyType: request.studyType || '',
+          studyTypes: getStudyTypes(request),
+          consentStatus: request.consentStatus,
+          diagnosis: request.diagnosis,
+          icdCode: request.icdCode,
+          diagnoses: request.diagnoses || [],
+          doctorComment: request.doctorComment || '',
+          registrarComment: formData.registrarComment.trim(),
+          currentStatus: resolvedCurrentStatus,
+          finalDecision: formData.finalDecision,
+        });
+
         const pendingNotification: PendingRegistrarUpdate = {
           currentStatus: resolvedCurrentStatus,
           finalDecision: formData.finalDecision,
@@ -687,10 +751,8 @@ export default function RequestDetailsPage() {
           userName: profile.fullName,
           requestId: id,
           actionType: 'REGISTRAR_EDIT',
-          oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-          newValue: formData.registrarComment.trim()
-            ? `${getUpdateSummary(resolvedCurrentStatus, formData.finalDecision)} / კომენტარი: ${formData.registrarComment.trim()}`
-            : getUpdateSummary(resolvedCurrentStatus, formData.finalDecision),
+          oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getUpdateSummary(request.currentStatus, request.finalDecision)}`,
+          newValue: editSummary,
         });
 
         setConfirmAction(null);
@@ -702,8 +764,32 @@ export default function RequestDetailsPage() {
       if (canDoctorEdit) {
         const diagnoses = sanitizeDiagnosisRows(formData.diagnoses);
         const representativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses });
+        const editSummary = buildRequestChangeSummary(request, {
+          patientData: {
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            historyNumber: formData.historyNumber.trim(),
+            personalId: formData.personalId.trim(),
+            birthDate: formData.birthDate,
+            insurance: formData.insurance.trim(),
+            phone: formData.phone.trim(),
+            address: formData.address.trim(),
+          },
+          requestedAction: request.requestedAction,
+          department: request.department || '',
+          studyType: request.studyType || '',
+          studyTypes: getStudyTypes(request),
+          consentStatus: request.consentStatus,
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          doctorComment: request.doctorComment || '',
+          registrarComment: request.registrarComment || '',
+          currentStatus: request.currentStatus,
+          finalDecision: request.finalDecision || '',
+        });
         const doctorNotification: PendingDoctorEdit = {
-          comment: formData.doctorEditComment.trim(),
+          comment: formData.doctorEditComment.trim() || editSummary,
           editedAt: Timestamp.now(),
           editedByUserEmail: profile.email,
           editedByUserId: profile.uid,
@@ -745,7 +831,7 @@ export default function RequestDetailsPage() {
           requestId: id,
           actionType: 'DOCTOR_EDIT',
           oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${request.icdCode || request.diagnosis || '-'}`,
-          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${representativeDiagnosis?.code || representativeDiagnosis?.combined || '-'} / კომენტარი: ${formData.doctorEditComment.trim()}`,
+          newValue: editSummary,
         });
 
         await syncRequestToSheet({
@@ -770,6 +856,30 @@ export default function RequestDetailsPage() {
           .split(',')
           .map((value) => value.trim())
           .filter(Boolean);
+        const editSummary = buildRequestChangeSummary(request, {
+          patientData: {
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            historyNumber: formData.historyNumber.trim(),
+            personalId: formData.personalId.trim(),
+            birthDate: formData.birthDate,
+            insurance: formData.insurance.trim(),
+            phone: formData.phone.trim(),
+            address: formData.address.trim(),
+          },
+          requestedAction: formData.requestedAction.trim(),
+          department: formData.department.trim(),
+          studyType: studyTypes.join(', '),
+          studyTypes,
+          consentStatus: formData.consentStatus.trim(),
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          doctorComment: formData.doctorComment.trim(),
+          registrarComment: formData.registrarComment.trim(),
+          currentStatus: resolvedCurrentStatus,
+          finalDecision: formData.finalDecision,
+        });
 
         await updateDoc(requestRef, {
           patientData: {
@@ -811,8 +921,8 @@ export default function RequestDetailsPage() {
           userName: profile.fullName,
           requestId: id,
           actionType: 'ADMIN_FULL_EDIT',
-          oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getUpdateSummary(request.currentStatus, request.finalDecision)}`,
-          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getUpdateSummary(resolvedCurrentStatus, formData.finalDecision)}`,
+          oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getRequestActionLabel(request.requestedAction, request.department)}`,
+          newValue: editSummary,
         });
 
         await syncRequestToSheet({
@@ -844,13 +954,29 @@ export default function RequestDetailsPage() {
 
       await updateDoc(requestRef, adminUpdateData);
 
+      const editSummary = buildRequestChangeSummary(request, {
+        patientData: request.patientData,
+        requestedAction: request.requestedAction,
+        department: request.department || '',
+        studyType: request.studyType || '',
+        studyTypes: getStudyTypes(request),
+        consentStatus: request.consentStatus,
+        diagnosis: request.diagnosis,
+        icdCode: request.icdCode,
+        diagnoses: request.diagnoses || [],
+        doctorComment: request.doctorComment || '',
+        registrarComment: formData.registrarComment.trim(),
+        currentStatus: resolvedCurrentStatus,
+        finalDecision: formData.finalDecision,
+      });
+
       await writeAuditLogEntry({
         userId: profile.uid,
         userName: profile.fullName,
         requestId: id,
         actionType: 'UPDATE',
-        oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
-        newValue: getUpdateSummary(resolvedCurrentStatus, formData.finalDecision),
+        oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getUpdateSummary(request.currentStatus, request.finalDecision)}`,
+        newValue: editSummary,
       });
 
       setConfirmAction(null);
@@ -1912,6 +2038,44 @@ export default function RequestDetailsPage() {
                   </span>
                 </div>
               )}
+
+              <div className="border-t border-slate-200 pt-4">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  რედაქტირების ისტორია
+                </div>
+
+                {historyLogs.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
+                    ცვლილებების ისტორია ჯერ არ არის.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {historyLogs.map((log) => (
+                      <div key={log.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-sm font-bold text-slate-900">
+                            {getAuditActionLabel(log.actionType)}
+                          </div>
+                          <div className="text-xs font-medium text-slate-400">
+                            {getDateTimeLabel(log.createdAt)}
+                          </div>
+                        </div>
+                        <div className="mt-1 text-sm text-slate-600">
+                          {log.userName}
+                        </div>
+                        <div className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700">
+                          {log.newValue}
+                        </div>
+                        {log.oldValue && (
+                          <div className="mt-2 text-xs leading-5 text-slate-400">
+                            მანამდე: {log.oldValue}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

@@ -139,14 +139,37 @@ function getPatientNameTextClass(request: ClinicalRequest) {
     : 'text-slate-900';
 }
 
-function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
-  return [...requests].sort(
-    (left, right) => getRequestTimestampValue(right) - getRequestTimestampValue(left),
-  );
+function getRequestPriority(request: ClinicalRequest) {
+  const displayStatus = normalizeRequestStatus(resolveRequestStatusFromRequest(request));
+
+  if (
+    request.adminConfirmationStatus === 'pending' ||
+    Boolean(request.requiresRegistrarAction) ||
+    displayStatus === 'ახალი' ||
+    displayStatus === 'განხილვაშია' ||
+    displayStatus === 'მიღებულია' ||
+    displayStatus === 'თანხმდება დაზღვევასთან'
+  ) {
+    return 0;
+  }
+
+  return 1;
+}
+
+function sortRequestsForDashboard(requests: ClinicalRequest[]) {
+  return [...requests].sort((left, right) => {
+    const priorityDifference = getRequestPriority(left) - getRequestPriority(right);
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    return getRequestTimestampValue(right) - getRequestTimestampValue(left);
+  });
 }
 
 function normalizeRequestCollection(docs: ClinicalRequest[]) {
-  return sortRequestsByCreatedAt(docs.filter((request) => !isArchivedRequest(request)));
+  return sortRequestsForDashboard(docs.filter((request) => !isArchivedRequest(request)));
 }
 
 function DiagnosisList({ request }: { request: ClinicalRequest }) {
