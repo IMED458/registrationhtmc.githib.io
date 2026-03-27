@@ -124,15 +124,6 @@ function needsRegistrarRework(request: ClinicalRequest) {
   return Boolean(request.requiresRegistrarAction && request.pendingDoctorEdit);
 }
 
-const REGISTRAR_COMPLETION_FINAL_DECISIONS = new Set([
-  'პაციენტი გაუშვით ბინაზე',
-  'პაციენტი დაწვეს კლინიკაში / სტაციონარში',
-]);
-
-function canRegistrarCompleteRequest(request: ClinicalRequest) {
-  return REGISTRAR_COMPLETION_FINAL_DECISIONS.has((request.finalDecision || '').trim());
-}
-
 function getPatientNameTextClass(request: ClinicalRequest) {
   return needsRegistrarRework(request) || hasDoctorEditPendingApproval(request)
     ? 'text-sky-600'
@@ -143,11 +134,9 @@ function getRequestPriority(request: ClinicalRequest) {
   const displayStatus = normalizeRequestStatus(resolveRequestStatusFromRequest(request));
 
   if (
-    request.adminConfirmationStatus === 'pending' ||
     Boolean(request.requiresRegistrarAction) ||
     displayStatus === 'ახალი' ||
     displayStatus === 'განხილვაშია' ||
-    displayStatus === 'მიღებულია' ||
     displayStatus === 'თანხმდება დაზღვევასთან'
   ) {
     return 0;
@@ -595,7 +584,7 @@ export default function Dashboard() {
                   </button>
                 )}
               </div>
-              {isRegistrar && canRegistrarCompleteRequest(req) && (
+              {isRegistrar && (
                 <label
                   className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700"
                   title={displayStatus === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
@@ -705,7 +694,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex flex-col items-end gap-3">
-                        {isRegistrar && canRegistrarCompleteRequest(req) && (
+                        {isRegistrar && (
                           <label
                             className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
                             title={displayStatus === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
