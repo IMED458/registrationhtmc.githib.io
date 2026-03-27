@@ -12,9 +12,12 @@ const NOTIFICATION_ICON_URL = `${import.meta.env.BASE_URL}favicon-32x32.png?v=20
 type NotificationPermissionState = NotificationPermission | 'unsupported';
 
 type RequestMeta = {
+  adminFeedActivity: string;
+  doctorEditActivity: string;
   finalDecision: string;
   hasPendingApproval: boolean;
   registrarActivity: string;
+  requiresRegistrarAction: boolean;
   status: string;
 };
 
@@ -164,6 +167,18 @@ function buildRegistrarNotification(request: ClinicalRequest): RequestNotificati
   const patientFullName = getPatientFullName(request);
   const sender = resolveUserDisplayName(request.createdByUserName, request.createdByUserEmail) || 'თანამშრომელი';
   const summary = getRequestSummary(request);
+  const registrarEditComment = request.pendingDoctorEdit?.comment?.trim();
+
+  if (request.requiresRegistrarAction && registrarEditComment) {
+    return {
+      title: 'მოთხოვნა განახლდა',
+      body: `${patientFullName} • ${registrarEditComment}`,
+      requestId: request.id,
+      tag: `registrar-update-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
+      targetPath: getRequestTargetPath(request.id),
+      variant: 'registrar',
+    };
+  }
 
   return {
     title: 'ახალი მოთხოვნა',
@@ -182,12 +197,15 @@ function buildAdminNotification(request: ClinicalRequest): RequestNotificationPa
     request.pendingDoctorEdit?.editedByUserName ||
     resolveUserDisplayName(request.createdByUserName, request.createdByUserEmail) ||
     'თანამშრომელი';
+  const requiresApproval = isPendingAdminConfirmation(request);
 
   return {
-    title: 'ახალი დადასტურება',
-    body: `${patientFullName} • ცვლილება ელოდება დადასტურებას • ${requestedBy}`,
+    title: requiresApproval ? 'ახალი დადასტურება' : 'ახალი ცვლილება',
+    body: requiresApproval
+      ? `${patientFullName} • ცვლილება ელოდება დადასტურებას • ${requestedBy}`
+      : `${patientFullName} • ცვლილება დაფიქსირდა • ${requestedBy}`,
     requestId: request.id,
-    tag: `admin-approval-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
+    tag: `${requiresApproval ? 'admin-approval' : 'admin-update'}-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
     targetPath: getRequestTargetPath(request.id),
     variant: 'admin',
   };
@@ -237,16 +255,16 @@ function getTimestampSignature(timestamp: any) {
 }
 
 type UseRequestNotificationsOptions = {
+  canReceiveRequestNotifications: boolean;
   isAdmin: boolean;
-  isDoctorOrNurse: boolean;
   isRegistrar: boolean;
   profile: UserProfile | null;
 };
 
 export function useRequestNotifications({
+  canReceiveRequestNotifications,
   profile,
   isAdmin,
-  isDoctorOrNurse,
   isRegistrar,
 }: UseRequestNotificationsOptions) {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() => getNotificationPermission());
@@ -293,7 +311,7 @@ export function useRequestNotifications({
     previousRequestsRef.current = new Map();
     hasHydratedSnapshotRef.current = false;
 
-    if (!profile || !db || (!isRegistrar && !isAdmin && !isDoctorOrNurse)) {
+    if (!profile || !db || (!isRegistrar && !isAdmin && !canReceiveRequestNotifications)) {
       return;
     }
 
@@ -311,6 +329,18 @@ export function useRequestNotifications({
           }
 
           const meta: RequestMeta = {
+            adminFeedActivity: [
+              getTimestampSignature(request.pendingRegistrarUpdate?.requestedAt),
+              getTimestampSignature(request.pendingDoctorEdit?.editedAt),
+              String(request.adminConfirmationStatus || ''),
+              String(Boolean(request.requiresRegistrarAction)),
+            ].join('|'),
+            doctorEditActivity: [
+              getTimestampSignature(request.lastDoctorEditAt),
+              String(request.pendingDoctorEdit?.comment || ''),
+              String(request.pendingDoctorEdit?.editedByUserId || ''),
+              String(Boolean(request.requiresRegistrarAction)),
+            ].join('|'),
             finalDecision: (request.finalDecision || '').trim(),
             hasPendingApproval: isPendingAdminConfirmation(request),
             registrarActivity: [
@@ -319,6 +349,7 @@ export function useRequestNotifications({
               (request.registrarName || '').trim(),
               (request.formFillerName || '').trim(),
             ].join('|'),
+            requiresRegistrarAction: Boolean(request.requiresRegistrarAction),
             status: normalizeRequestStatus(resolveRequestStatusFromRequest(request)),
           };
 
@@ -335,13 +366,29 @@ export function useRequestNotifications({
             return;
           }
 
-          if (isAdmin && meta.hasPendingApproval && !previousRequest?.hasPendingApproval) {
+          if (
+            isRegistrar &&
+            previousRequest &&
+            request.createdByUserId !== profile.uid &&
+            meta.requiresRegistrarAction &&
+            previousRequest.doctorEditActivity !== meta.doctorEditActivity
+          ) {
+            queuedNotifications.push(buildRegistrarNotification(request));
+            return;
+          }
+
+          if (
+            isAdmin &&
+            previousRequest &&
+            previousRequest.adminFeedActivity !== meta.adminFeedActivity &&
+            (meta.hasPendingApproval || Boolean(request.pendingDoctorEdit))
+          ) {
             queuedNotifications.push(buildAdminNotification(request));
             return;
           }
 
           if (
-            isDoctorOrNurse &&
+            canReceiveRequestNotifications &&
             requestBelongsToCurrentUser(request, profile) &&
             previousRequest &&
             (
@@ -422,7 +469,7 @@ export function useRequestNotifications({
     );
 
     return unsubscribe;
-  }, [isAdmin, isDoctorOrNurse, isRegistrar, notificationPermission, profile]);
+  }, [canReceiveRequestNotifications, isAdmin, isRegistrar, notificationPermission, profile]);
 
   useEffect(() => {
     if (!inAppNotifications.length) {

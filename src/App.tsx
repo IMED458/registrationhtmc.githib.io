@@ -67,6 +67,12 @@ export default function App() {
               <RequestDetailsPage />
             </ProtectedRoute>
           } />
+
+          <Route path="/request/:id/edit" element={
+            <ProtectedRoute>
+              <NewRequestPage />
+            </ProtectedRoute>
+          } />
           
           <Route path="/print/:id" element={
             <ProtectedRoute>

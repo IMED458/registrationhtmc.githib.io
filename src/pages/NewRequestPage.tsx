@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, doc, getDoc, Timestamp } from 'firebase/firestore';
+import { useNavigate, useParams } from 'react-router-dom';
+import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
@@ -11,7 +11,7 @@ import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils
 import { resolveRequestStatus } from '../requestStatusUtils';
 import { lookupPatientFromSheet } from '../sheetLookup';
 import { resolveServerApiUrl } from '../serverApi';
-import { sanitizeStudyTypes } from '../studyTypeUtils';
+import { getStudyTypes, sanitizeStudyTypes } from '../studyTypeUtils';
 import { ClinicalRequest, DiagnosisEntry } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS, STUDY_TYPE_OPTIONS } from '../constants';
 import { ArrowLeft, FileText, Loader2, Plus, Save, Search, Trash2, User } from 'lucide-react';
@@ -60,15 +60,104 @@ function sanitizeDiagnoses(rows: DiagnosisFormRow[]): DiagnosisEntry[] {
   return sanitizedRows;
 }
 
+function buildFormDataFromRequest(request: ClinicalRequest) {
+  const diagnoses = (request.diagnoses?.length
+    ? request.diagnoses
+    : [{
+        icdCode: request.icdCode || '',
+        diagnosis: request.diagnosis || '',
+        isPrimary: true,
+      }]
+  )
+    .filter((entry) => entry.icdCode || entry.diagnosis)
+    .map((entry) => createDiagnosisRow({
+      icdCode: entry.icdCode || '',
+      diagnosis: entry.diagnosis || '',
+      isPrimary: Boolean(entry.isPrimary),
+    }));
+
+  return {
+    firstName: request.patientData.firstName || '',
+    lastName: request.patientData.lastName || '',
+    historyNumber: request.patientData.historyNumber || '',
+    personalId: request.patientData.personalId || '',
+    birthDate: request.patientData.birthDate || '',
+    insurance: request.patientData.insurance || '',
+    phone: request.patientData.phone || '',
+    address: request.patientData.address || '',
+    diagnoses: diagnoses.length ? diagnoses : [createDiagnosisRow({ isPrimary: true })],
+    requestedAction: request.requestedAction || REQUEST_ACTIONS[0],
+    department: request.department || '',
+    studyTypes: getStudyTypes(request),
+    consentStatus: request.consentStatus || '',
+    doctorComment: request.doctorComment || '',
+    senderName: request.formFillerName || request.createdByUserName || '',
+  };
+}
+
+function getActionLabel(requestedAction: string, department: string) {
+  if (requestedAction === 'სტაციონარი') {
+    return department.trim() || 'სტაციონარი';
+  }
+
+  return requestedAction.trim() || '-';
+}
+
+function buildRegistrarEditSummary(
+  previousRequest: ClinicalRequest,
+  nextValues: {
+    requestedAction: string;
+    department: string;
+    diagnoses: DiagnosisEntry[];
+    consentStatus: string;
+  },
+) {
+  const summaryParts: string[] = [];
+  const previousAction = previousRequest.requestedAction;
+  const nextAction = nextValues.requestedAction;
+  const previousDepartment = previousRequest.department || '';
+  const nextDepartment = nextValues.department || '';
+  const previousDiagnosis = `${previousRequest.icdCode || ''} ${previousRequest.diagnosis || ''}`.trim();
+  const nextRepresentativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses: nextValues.diagnoses });
+  const nextDiagnosis = `${nextRepresentativeDiagnosis?.code || nextRepresentativeDiagnosis?.icdCode || ''} ${nextRepresentativeDiagnosis?.diagnosis || ''}`.trim();
+  const previousConsent = previousRequest.consentStatus || '';
+  const nextConsent = nextValues.consentStatus || '';
+
+  if (previousAction === 'ბინა' && nextAction === 'სტაციონარი') {
+    summaryParts.push(`ბინა განახლდა სტაციონარით${nextDepartment ? ` (${nextDepartment})` : ''}`);
+  } else if (previousAction === 'სტაციონარი' && nextAction === 'ბინა') {
+    summaryParts.push('სტაციონარი განახლდა ბინით');
+  } else if (
+    previousAction !== nextAction ||
+    (nextAction === 'სტაციონარი' && previousDepartment !== nextDepartment)
+  ) {
+    summaryParts.push(`მოქმედება შეიცვალა: ${getActionLabel(previousAction, previousDepartment)} -> ${getActionLabel(nextAction, nextDepartment)}`);
+  }
+
+  if (previousDiagnosis !== nextDiagnosis && nextDiagnosis) {
+    summaryParts.push(`დიაგნოზი განახლდა: ${nextDiagnosis}`);
+  }
+
+  if (previousConsent !== nextConsent) {
+    summaryParts.push(`თანხმობა/უარი განახლდა: ${nextConsent || '-'}`);
+  }
+
+  return summaryParts.join(' • ') || 'ჩანაწერი განახლდა';
+}
+
 export default function NewRequestPage() {
-  const { profile, canCreateRequests } = useAuth();
+  const { id: editRequestId } = useParams();
+  const { profile, canCreateRequests, canFullRequestEdit, canEditAllRequests } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [requestLoading, setRequestLoading] = useState(Boolean(editRequestId));
   const [error, setError] = useState('');
   const [lookupMessage, setLookupMessage] = useState('');
   const [patientLookupSource, setPatientLookupSource] = useState<'manual' | 'sheet'>('manual');
+  const [existingRequest, setExistingRequest] = useState<ClinicalRequest | null>(null);
   const icdLookupRequestRef = useRef(0);
+  const isEditMode = Boolean(editRequestId);
   const requiresStructuredFields = patientLookupSource === 'sheet';
   const automaticSenderName = resolveUserDisplayName(profile?.fullName, profile?.email) || 'ემერჯენსი';
   
@@ -105,6 +194,17 @@ export default function NewRequestPage() {
   const hasMultipleDiagnoses = formData.diagnoses.length > 1;
   const hasExplicitPrimaryDiagnosis = formData.diagnoses.some((row) => row.isPrimary);
   const navigateToDashboard = () => navigate('/', { replace: true });
+  const canEditCurrentRequest = !isEditMode || (
+    canFullRequestEdit &&
+    (
+      canEditAllRequests ||
+      (
+        existingRequest &&
+        profile &&
+        (existingRequest.createdByUserId === profile.uid || existingRequest.createdByUserEmail === profile.email)
+      )
+    )
+  );
 
   const filteredDepts = DEPARTMENTS.filter(d => 
     d.toLowerCase().includes(deptSearch.toLowerCase())
@@ -133,6 +233,41 @@ export default function NewRequestPage() {
   useEffect(() => {
     void preloadIcdEntries();
   }, []);
+
+  useEffect(() => {
+    if (!editRequestId) {
+      setRequestLoading(false);
+      return;
+    }
+
+    const loadRequest = async () => {
+      setRequestLoading(true);
+      setError('');
+
+      try {
+        const requestSnap = await getDoc(doc(db, 'requests', editRequestId));
+
+        if (!requestSnap.exists()) {
+          setError('ჩანაწერი ვერ მოიძებნა.');
+          setExistingRequest(null);
+          return;
+        }
+
+        const nextRequest = { id: requestSnap.id, ...requestSnap.data() } as ClinicalRequest;
+        setExistingRequest(nextRequest);
+        setFormData(buildFormDataFromRequest(nextRequest));
+        setDeptSearch(nextRequest.department || '');
+        setPatientLookupSource((nextRequest.patientData.firstName || nextRequest.patientData.lastName) ? 'sheet' : 'manual');
+      } catch (loadError) {
+        console.error('Request edit load error:', loadError);
+        setError('ჩანაწერის ჩატვირთვა ვერ მოხერხდა.');
+      } finally {
+        setRequestLoading(false);
+      }
+    };
+
+    void loadRequest();
+  }, [editRequestId]);
 
   const runIcdSearch = async (rowId: string, query: string, field: 'code' | 'diagnosis') => {
     const requestId = icdLookupRequestRef.current + 1;
@@ -425,8 +560,13 @@ export default function NewRequestPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    if (!canCreateRequests) {
-      setError('ახალი მოთხოვნის შექმნა შეუძლიათ მხოლოდ ექიმს/ექთანს ან ადმინისტრატორს.');
+    if (!isEditMode && !canCreateRequests) {
+      setError('ამ ანგარიშს ახალი მოთხოვნის შექმნის უფლება არ აქვს.');
+      return;
+    }
+
+    if (isEditMode && !canEditCurrentRequest) {
+      setError('ამ ანგარიშს ამ ჩანაწერის სრული რედაქტირების უფლება არ აქვს.');
       return;
     }
 
@@ -471,45 +611,104 @@ export default function NewRequestPage() {
       }
 
       const representativeDiagnosis = getRepresentativeDiagnosisEntry({ diagnoses });
+      const resolvedCurrentStatus = resolveRequestStatus(
+        (existingRequest?.currentStatus || 'ახალი') as ClinicalRequest['currentStatus'],
+        formData.requestedAction,
+        formData.department,
+        existingRequest?.finalDecision || '',
+      );
 
-      const requestData: Omit<ClinicalRequest, 'id'> = {
-        patientData: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          historyNumber: formData.historyNumber,
-          personalId: formData.personalId,
-          birthDate: formData.birthDate,
-          insurance: formData.insurance,
-          phone: formData.phone,
-          address: formData.address,
-        },
-        createdByUserId: profile.uid,
-        createdByUserName: resolvedSenderName,
-        createdByUserEmail: profile.email,
-        formFillerName: resolvedSenderName,
-        requestedAction: formData.requestedAction,
-        department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
-        studyType: studyTypes.join(', '),
-        studyTypes,
-        consentStatus: formData.consentStatus,
-        diagnosis: representativeDiagnosis?.diagnosis || '',
-        icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
-        diagnoses,
-        doctorComment: formData.doctorComment,
-        currentStatus: resolveRequestStatus('ახალი', formData.requestedAction, formData.department, ''),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+      const nextPatientData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        historyNumber: formData.historyNumber,
+        personalId: formData.personalId,
+        birthDate: formData.birthDate,
+        insurance: formData.insurance,
+        phone: formData.phone,
+        address: formData.address,
       };
 
-      const docRef = await addDoc(collection(db, 'requests'), requestData);
+      if (isEditMode && existingRequest && editRequestId) {
+        const editSummary = buildRegistrarEditSummary(existingRequest, {
+          requestedAction: formData.requestedAction,
+          department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
+          diagnoses,
+          consentStatus: formData.consentStatus,
+        });
 
-      await writeAuditLogEntry({
-        userId: profile.uid,
-        userName: profile.fullName,
-        requestId: docRef.id,
-        actionType: 'CREATE',
-        newValue: 'ახალი მოთხოვნა შეიქმნა',
-      });
+        await updateDoc(doc(db, 'requests', editRequestId), {
+          patientData: nextPatientData,
+          requestedAction: formData.requestedAction,
+          department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
+          studyType: studyTypes.join(', '),
+          studyTypes,
+          consentStatus: formData.consentStatus,
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          doctorComment: formData.doctorComment,
+          formFillerName: resolvedSenderName,
+          currentStatus: resolvedCurrentStatus,
+          requiresRegistrarAction: true,
+          pendingDoctorEdit: {
+            comment: editSummary,
+            editedAt: Timestamp.now(),
+            editedByUserEmail: profile.email,
+            editedByUserId: profile.uid,
+            editedByUserName: profile.fullName,
+          },
+          lastDoctorEditAt: Timestamp.now(),
+          lastDoctorEditByUserId: profile.uid,
+          lastDoctorEditByUserName: profile.fullName,
+          lastDoctorEditByUserEmail: profile.email,
+          lastDoctorEditComment: editSummary,
+          adminConfirmationStatus: null,
+          adminConfirmedAt: null,
+          adminConfirmedByUserId: '',
+          adminConfirmedByUserName: '',
+          updatedAt: Timestamp.now(),
+        });
+
+        await writeAuditLogEntry({
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: editRequestId,
+          actionType: 'FULL_EDIT',
+          oldValue: `${existingRequest.patientData.firstName} ${existingRequest.patientData.lastName} / ${existingRequest.requestedAction}`,
+          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getActionLabel(formData.requestedAction, formData.department)} / ${editSummary}`,
+        });
+      } else {
+        const requestData: Omit<ClinicalRequest, 'id'> = {
+          patientData: nextPatientData,
+          createdByUserId: profile.uid,
+          createdByUserName: resolvedSenderName,
+          createdByUserEmail: profile.email,
+          formFillerName: resolvedSenderName,
+          requestedAction: formData.requestedAction,
+          department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
+          studyType: studyTypes.join(', '),
+          studyTypes,
+          consentStatus: formData.consentStatus,
+          diagnosis: representativeDiagnosis?.diagnosis || '',
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          diagnoses,
+          doctorComment: formData.doctorComment,
+          currentStatus: resolveRequestStatus('ახალი', formData.requestedAction, formData.department, ''),
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
+
+        const docRef = await addDoc(collection(db, 'requests'), requestData);
+
+        await writeAuditLogEntry({
+          userId: profile.uid,
+          userName: profile.fullName,
+          requestId: docRef.id,
+          actionType: 'CREATE',
+          newValue: 'ახალი მოთხოვნა შეიქმნა',
+        });
+      }
 
       const sheetSyncUrl = resolveServerApiUrl('/api/external/sync-request');
 
@@ -543,9 +742,11 @@ export default function NewRequestPage() {
       console.error("Submit error:", err);
       setError(
         getFirebaseActionErrorMessage(err, {
-          fallback: 'მოთხოვნის გაგზავნა ვერ მოხერხდა.',
+          fallback: isEditMode ? 'ჩანაწერის განახლება ვერ მოხერხდა.' : 'მოთხოვნის გაგზავნა ვერ მოხერხდა.',
           permissionDenied:
-            'ამ ანგარიშით მოთხოვნის გაგზავნა ვერ მოხერხდა, რადგან Firestore-ში write წვდომა არ არის ნებადართული.',
+            isEditMode
+              ? 'ამ ანგარიშით ჩანაწერის რედაქტირება ვერ მოხერხდა, რადგან Firestore-ში write წვდომა არ არის ნებადართული.'
+              : 'ამ ანგარიშით მოთხოვნის გაგზავნა ვერ მოხერხდა, რადგან Firestore-ში write წვდომა არ არის ნებადართული.',
         }),
       );
     } finally {
@@ -553,7 +754,17 @@ export default function NewRequestPage() {
     }
   };
 
-  if (profile && !canCreateRequests) {
+  if (requestLoading) {
+    return (
+      <div className="w-full max-w-none space-y-6 pb-12">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-slate-400 shadow-sm">
+          ჩანაწერი იტვირთება...
+        </div>
+      </div>
+    );
+  }
+
+  if (isEditMode && !existingRequest) {
     return (
       <div className="w-full max-w-none space-y-6 pb-12">
         <div className="flex items-center gap-4">
@@ -563,13 +774,47 @@ export default function NewRequestPage() {
           >
             <ArrowLeft className="w-6 h-6 text-slate-500" />
           </button>
-          <h2 className="text-2xl font-bold text-slate-900">ახალი მოთხოვნის შექმნა</h2>
+          <h2 className="text-2xl font-bold text-slate-900">მოთხოვნის რედაქტირება</h2>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-6 space-y-3">
+          <h3 className="text-lg font-bold text-slate-900">ჩანაწერი ვერ მოიძებნა</h3>
+          <p className="text-slate-600">
+            {error || 'არჩეული მოთხოვნის ჩატვირთვა ვერ მოხერხდა.'}
+          </p>
+          <button
+            type="button"
+            onClick={navigateToDashboard}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold"
+          >
+            მთავარ გვერდზე დაბრუნება
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if ((!isEditMode && profile && !canCreateRequests) || (isEditMode && profile && !canEditCurrentRequest && existingRequest)) {
+    return (
+      <div className="w-full max-w-none space-y-6 pb-12">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6 text-slate-500" />
+          </button>
+          <h2 className="text-2xl font-bold text-slate-900">
+            {isEditMode ? 'მოთხოვნის რედაქტირება' : 'ახალი მოთხოვნის შექმნა'}
+          </h2>
         </div>
 
         <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-6 space-y-3">
           <h3 className="text-lg font-bold text-slate-900">წვდომა შეზღუდულია</h3>
           <p className="text-slate-600">
-            ახალი მოთხოვნის შექმნა შეუძლიათ მხოლოდ ექიმს/ექთანს ან ადმინისტრატორს.
+            {isEditMode
+              ? 'ამ ანგარიშს ამ ჩანაწერის სრული რედაქტირების უფლება არ აქვს.'
+              : 'ამ ანგარიშს ახალი მოთხოვნის შექმნის უფლება არ აქვს.'}
           </p>
           <button
             type="button"
@@ -592,7 +837,9 @@ export default function NewRequestPage() {
         >
           <ArrowLeft className="w-6 h-6 text-slate-500" />
         </button>
-        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">ახალი მოთხოვნის შექმნა</h2>
+        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+          {isEditMode ? 'მოთხოვნის რედაქტირება' : 'ახალი მოთხოვნის შექმნა'}
+        </h2>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1104,7 +1351,7 @@ export default function NewRequestPage() {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 font-bold text-white transition-all shadow-lg shadow-emerald-100 hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            მოთხოვნის გაგზავნა
+            {isEditMode ? 'ცვლილებების შენახვა' : 'მოთხოვნის გაგზავნა'}
           </button>
         </div>
       </form>

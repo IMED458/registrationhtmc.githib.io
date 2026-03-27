@@ -32,20 +32,28 @@ service cloud.firestore {
         userEmail() == "nino.nikaberidze@gmail.com";
     }
 
+    function isShiftManager() {
+      return isSignedIn() && (
+        userEmail() == "giorgit@registrationhtmc.local" ||
+        userEmail() == "gulshanm@registrationhtmc.local" ||
+        userEmail() == "ninoch@registrationhtmc.local"
+      );
+    }
+
     function isAllowedUser() {
-      return isAdmin() || isDoctor() || isRegistrar() || isUser();
+      return isAdmin() || isDoctor() || isRegistrar() || isUser() || isShiftManager();
     }
 
     function canCreateRequests() {
-      return isAdmin() || isDoctor() || isUser();
+      return isAdmin() || isDoctor() || isUser() || isShiftManager();
     }
 
     function canUpdateRequests() {
-      return isAdmin() || isDoctor() || isRegistrar();
+      return isAdmin() || isDoctor() || isRegistrar() || isUser() || isShiftManager();
     }
 
     function canCreateAuditLogs() {
-      return isAdmin() || isDoctor() || isRegistrar() || isUser();
+      return isAdmin() || isDoctor() || isRegistrar() || isUser() || isShiftManager();
     }
 
     match /users/{userId} {

@@ -218,7 +218,7 @@ function buildFormDataFromRequest(
 
 export default function RequestDetailsPage() {
   const { id } = useParams();
-  const { profile, isRegistrar, isAdmin, isDoctorOrNurse } = useAuth();
+  const { profile, isRegistrar, isAdmin, isDoctorOrNurse, canFullRequestEdit, canEditAllRequests } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [request, setRequest] = useState<ClinicalRequest | null>(null);
@@ -239,7 +239,12 @@ export default function RequestDetailsPage() {
     !!profile &&
     (request.createdByUserId === profile.uid || request.createdByUserEmail === profile.email);
   const canDoctorEdit = isDoctorOrNurse && isRequestOwner && !isAdmin && !isRegistrar;
-  const canOpenFullEdit = canDoctorEdit || isAdmin;
+  const canUseDedicatedEditPage = Boolean(
+    canFullRequestEdit &&
+    request &&
+    (canEditAllRequests || isRequestOwner),
+  );
+  const canOpenFullEdit = canDoctorEdit || canUseDedicatedEditPage;
   const showManagementPanel = isRegistrarOnly || isAdmin;
   const isDoctorInlineEditing = canDoctorEdit && isEditing;
   const shouldStartInEditMode = Boolean((location.state as { startEditing?: boolean } | null)?.startEditing);
@@ -495,6 +500,11 @@ export default function RequestDetailsPage() {
   };
 
   const handleStartEditing = () => {
+    if (canUseDedicatedEditPage && id) {
+      navigate(`/request/${id}/edit`);
+      return;
+    }
+
     setFormError('');
     setSyncNoticeMessage('');
     setFormData(buildFormDataFromRequest(request, profile?.fullName));
@@ -562,7 +572,7 @@ export default function RequestDetailsPage() {
           actionType: 'UPDATE_CONFIRMED',
           oldValue: getUpdateSummary(request.currentStatus, request.finalDecision),
           newValue: confirmingDoctorEdit
-            ? 'ადმინისტრატორმა დაადასტურა ექიმის რედაქტირება'
+            ? 'ადმინისტრატორმა დაადასტურა ცვლილება'
             : 'ადმინისტრატორმა დაადასტურა რეგისტრატორის რედაქტირება',
         });
 
@@ -796,7 +806,7 @@ export default function RequestDetailsPage() {
         message:
           confirmAction === 'approve'
             ? pendingDoctorEdit && !pendingUpdate
-              ? 'ნამდვილად გსურთ ექიმის მიერ შეტანილი ცვლილების დადასტურება?'
+              ? 'ნამდვილად გსურთ შეტანილი ცვლილების დადასტურება?'
               : 'ნამდვილად გსურთ რეგისტრატორის მიერ შეტანილი ცვლილების დადასტურება?'
             : isRegistrarOnly
               ? 'ცვლილება დაუყოვნებლივ შეინახება და ადმინთან შეტყობინებაც გაიგზავნება. გაგრძელება გსურთ?'
@@ -1207,13 +1217,13 @@ export default function RequestDetailsPage() {
                 {request.lastDoctorEditAt && (
                   <>
                     <div>
-                      <div className="text-xs text-slate-400 uppercase font-bold">ექიმის ბოლო ცვლილება</div>
+                      <div className="text-xs text-slate-400 uppercase font-bold">ბოლო სრული ცვლილება</div>
                       <div className="font-bold text-slate-900">
                         {request.lastDoctorEditByUserName || '-'}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 uppercase font-bold">ადმინის დადასტურება ექიმის რედაქტირებაზე</div>
+                      <div className="text-xs text-slate-400 uppercase font-bold">ადმინის სტატუსი ცვლილებაზე</div>
                       <div className={`font-bold ${request.adminConfirmationStatus === 'pending' ? 'text-amber-700' : request.adminConfirmationStatus === 'confirmed' ? 'text-emerald-700' : 'text-slate-500'}`}>
                         {request.adminConfirmationStatus === 'pending'
                           ? 'ელოდება დადასტურებას'
@@ -1734,13 +1744,17 @@ export default function RequestDetailsPage() {
             <div className="overflow-hidden rounded-2xl border border-sky-200 bg-sky-50 shadow-sm">
               <div className="border-b border-sky-200 px-6 py-3 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-sky-600" />
-                <h3 className="font-bold text-sky-900">ექიმის რედაქტირება</h3>
+                <h3 className="font-bold text-sky-900">სრული რედაქტირება</h3>
               </div>
               <div className="space-y-4 p-4 sm:p-6">
                 <p className="text-sm leading-6 text-sky-900">
                   {isRegistrar || isAdmin
-                    ? 'ექიმმა/ექთანმა პაციენტის მონაცემები ან დიაგნოზები შეცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
-                    : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'}
+                    ? request.adminConfirmationStatus === 'pending'
+                      ? 'ჩანაწერი შეიცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
+                      : 'ჩანაწერი შეიცვალა და რეგისტრატორის შემდგომ მოქმედებას ელოდება.'
+                    : request.adminConfirmationStatus === 'pending'
+                      ? 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'
+                      : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან ინფორმაციისთვის გაიგზავნა.'}
                 </p>
                 <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   <div>
@@ -1753,7 +1767,7 @@ export default function RequestDetailsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-bold uppercase text-sky-700">ექიმის კომენტარი</div>
+                  <div className="text-xs font-bold uppercase text-sky-700">ცვლილების კომენტარი</div>
                   <div className="mt-1 rounded-xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
                     {pendingDoctorEdit.comment}
                   </div>

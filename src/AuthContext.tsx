@@ -12,11 +12,14 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  canFullRequestEdit: boolean;
+  canEditAllRequests: boolean;
   canEditAdminContent: boolean;
   canCreateRequests: boolean;
   canAccessRequestsModule: boolean;
   canAccessAdminPanel: boolean;
   canApproveAdminChanges: boolean;
+  canReceiveRequestNotifications: boolean;
   isDoctorOrNurse: boolean;
   isRegistrar: boolean;
 }
@@ -182,15 +185,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     loading,
     isAdmin: profile?.role === 'admin',
-    canEditAdminContent: profile?.role === 'admin',
-    canCreateRequests:
-      profile?.role === 'admin' ||
-      profile?.role === 'doctor' ||
-      profile?.role === 'nurse' ||
-      profile?.role === 'user',
-    canAccessRequestsModule: profile?.role === 'admin' || profile?.role === 'user',
-    canAccessAdminPanel: profile?.role === 'admin',
-    canApproveAdminChanges: profile?.role === 'admin',
+    canFullRequestEdit: Boolean(getAllowedUserConfig(profile?.email)?.canFullRequestEdit),
+    canEditAllRequests: Boolean(getAllowedUserConfig(profile?.email)?.canEditAllRequests),
+    canEditAdminContent: Boolean(getAllowedUserConfig(profile?.email)?.canEditAdminContent),
+    canCreateRequests: Boolean(getAllowedUserConfig(profile?.email)?.canCreateRequests),
+    canAccessRequestsModule: Boolean(getAllowedUserConfig(profile?.email)?.canAccessRequestsModule),
+    canAccessAdminPanel: Boolean(getAllowedUserConfig(profile?.email)?.canAccessAdminPanel),
+    canApproveAdminChanges: Boolean(getAllowedUserConfig(profile?.email)?.canApproveAdminChanges),
+    canReceiveRequestNotifications: Boolean(getAllowedUserConfig(profile?.email)?.canReceiveRequestNotifications),
     isDoctorOrNurse: profile?.role === 'doctor' || profile?.role === 'nurse',
     isRegistrar: profile?.role === 'registrar',
   };

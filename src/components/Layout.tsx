@@ -44,7 +44,15 @@ function getInAppNotificationStyles(notification: InAppNotification) {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, canCreateRequests, canAccessRequestsModule, canAccessAdminPanel, isDoctorOrNurse, isRegistrar } = useAuth();
+  const {
+    profile,
+    isAdmin,
+    canCreateRequests,
+    canAccessRequestsModule,
+    canAccessAdminPanel,
+    canReceiveRequestNotifications,
+    isRegistrar,
+  } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
@@ -65,15 +73,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     requestNotificationPermission,
     supportsNotifications,
   } = useRequestNotifications({
+    canReceiveRequestNotifications,
     profile,
     isAdmin,
-    isDoctorOrNurse,
     isRegistrar,
   });
 
   const shouldShowNotificationButton =
     supportsNotifications &&
-    (isAdmin || isRegistrar || isDoctorOrNurse) &&
+    (isAdmin || isRegistrar || canReceiveRequestNotifications) &&
     notificationPermission !== 'granted';
 
   useEffect(() => {
@@ -85,13 +93,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const unsubscribe = onSnapshot(
       collection(db, 'requests'),
       (snapshot) => {
-        const count = snapshot.docs.reduce((total, requestDoc) => {
-          const request = requestDoc.data() as ClinicalRequest;
-          const hasPendingApproval =
-            request.adminConfirmationStatus === 'pending' &&
-            Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
+          const count = snapshot.docs.reduce((total, requestDoc) => {
+            const request = requestDoc.data() as ClinicalRequest;
+            const hasPendingApproval =
+              request.adminConfirmationStatus === 'pending' &&
+              Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
+            const hasInformationalUpdate =
+              Boolean(request.pendingDoctorEdit) && !hasPendingApproval;
 
-          return hasPendingApproval ? total + 1 : total;
+          return hasPendingApproval || hasInformationalUpdate ? total + 1 : total;
         }, 0);
 
         setPendingApprovalCount(count);

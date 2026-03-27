@@ -34,7 +34,7 @@ function sortArchivedRequests(requests: ClinicalRequest[]) {
 }
 
 export default function ArchivePage() {
-  const { profile, isAdmin, isDoctorOrNurse } = useAuth();
+  const { profile, isAdmin, isDoctorOrNurse, canFullRequestEdit, canEditAllRequests } = useAuth();
   const navigate = useNavigate();
   const [archivedRequests, setArchivedRequests] = useState<ClinicalRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export default function ArchivePage() {
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
   const canEditRequest = (request: ClinicalRequest) => {
-    if (isAdmin) {
+    if (canFullRequestEdit && (canEditAllRequests || request.createdByUserId === profile?.uid || request.createdByUserEmail === profile?.email)) {
       return true;
     }
 
@@ -78,7 +78,7 @@ export default function ArchivePage() {
   };
 
   const handleEditRequest = (requestId: string) => {
-    navigate(`/request/${requestId}`, { state: { startEditing: true } });
+    navigate(`/request/${requestId}/edit`);
   };
 
   const handleDeleteRequest = async (request: ClinicalRequest) => {

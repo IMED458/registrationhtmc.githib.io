@@ -451,7 +451,7 @@ export default function Dashboard() {
                   </div>
                   {needsRegistrarRework(req) && (
                     <div className="mt-1 text-xs font-bold text-sky-600">
-                      შეცვლილია და ელოდება ახლიდან მოქმედებას
+                      ჩანაწერი შეიცვალა და ელოდება ახლიდან მოქმედებას
                     </div>
                   )}
                 </div>
@@ -510,7 +510,7 @@ export default function Dashboard() {
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wide text-sky-600">ახალი ცვლილება</div>
                     <div className="mt-1 text-sm font-bold text-sky-600">
-                      ექიმმა/ექთანმა შეცვალა ჩანაწერი და რეგისტრატორის მოქმედებას ელოდება
+                      ჩანაწერი შეიცვალა და რეგისტრატორის მოქმედებას ელოდება
                     </div>
                   </div>
                 )}
@@ -599,7 +599,7 @@ export default function Dashboard() {
                       <div className={`font-bold ${getPatientNameTextClass(req)}`}>{req.patientData.firstName} {req.patientData.lastName}</div>
                       {needsRegistrarRework(req) && (
                         <div className="mt-1 text-xs font-bold text-sky-600">
-                          შეცვლილია და ელოდება ახლიდან მოქმედებას
+                          ჩანაწერი შეიცვალა და ელოდება ახლიდან მოქმედებას
                         </div>
                       )}
                     </td>
@@ -647,7 +647,7 @@ export default function Dashboard() {
                         )}
                         {needsRegistrarRework(req) && (
                           <div className="max-w-xs text-sm font-bold leading-5 whitespace-normal text-sky-600">
-                            ექიმის ცვლილება რეგისტრატორის ხელახლა მოქმედებას ელოდება
+                            ცვლილება რეგისტრატორის ხელახლა მოქმედებას ელოდება
                           </div>
                         )}
                       </div>

@@ -32,7 +32,6 @@ export default function AdminRequestsPage() {
           .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
           .filter((request) => (
             !isArchivedRequest(request) &&
-            request.adminConfirmationStatus === 'pending' &&
             (request.pendingRegistrarUpdate || request.pendingDoctorEdit)
           ));
 
@@ -82,7 +81,7 @@ export default function AdminRequestsPage() {
         userName: profile.fullName,
         requestId: request.id,
         actionType: 'UPDATE_CONFIRMED',
-        newValue: `ადმინისტრატორმა დაადასტურა ${isDoctorEdit ? 'ექიმის' : 'რეგისტრატორის'} რედაქტირება: ${request.patientData.firstName} ${request.patientData.lastName}`,
+        newValue: `ადმინისტრატორმა დაადასტურა ${isDoctorEdit ? 'ცვლილება' : 'რეგისტრატორის რედაქტირება'}: ${request.patientData.firstName} ${request.patientData.lastName}`,
         oldValue: request.pendingRegistrarUpdate?.registrarComment || request.pendingDoctorEdit?.comment || undefined,
       });
     } catch (error) {
@@ -107,7 +106,7 @@ export default function AdminRequestsPage() {
     <div className="w-full max-w-none space-y-8 pb-12">
       <div>
         <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნები</h2>
-        <p className="text-slate-500">რეგისტრატორის და ექიმის ცვლილებები, რომლებიც ადმინისტრატორის დადასტურებას ელოდება</p>
+        <p className="text-slate-500">რეგისტრატორის დასადასტურებელი და სხვა სრული რედაქტირებების შეტყობინებები</p>
         {!canApproveAdminChanges && (
           <p className="mt-2 text-sm font-bold text-amber-700">
             ამ ანგარიშს მოთხოვნების დადასტურების უფლება არ აქვს.
@@ -128,6 +127,9 @@ export default function AdminRequestsPage() {
           {requests.map((request) => (
             <div key={request.id} className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
               {(() => {
+                const requiresApproval =
+                  request.adminConfirmationStatus === 'pending' &&
+                  Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
                 const isDoctorEdit = Boolean(request.pendingDoctorEdit && !request.pendingRegistrarUpdate);
                 const pendingComment = request.pendingRegistrarUpdate?.registrarComment || request.pendingDoctorEdit?.comment || '-';
                 const editorName =
@@ -157,7 +159,7 @@ export default function AdminRequestsPage() {
                     <div>
                       <div className="text-xs font-bold uppercase text-amber-700">ცვლილების ტიპი</div>
                       <div className="mt-1 font-bold text-slate-900">
-                        {isDoctorEdit ? 'ექიმის/ექთნის რედაქტირება' : 'რეგისტრატორის რედაქტირება'}
+                        {isDoctorEdit ? 'სრული რედაქტირება' : 'რეგისტრატორის რედაქტირება'}
                       </div>
                     </div>
                     <div>
@@ -188,6 +190,11 @@ export default function AdminRequestsPage() {
                       {pendingComment}
                     </div>
                   </div>
+                  {!requiresApproval && (
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700">
+                      ეს ცვლილება ინფორმაციისთვის გამოგეგზავნათ. დადასტურება საჭირო არ არის.
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-[280px]">
@@ -199,7 +206,7 @@ export default function AdminRequestsPage() {
                     <MoreHorizontal className="h-4 w-4" />
                     დეტალები
                   </button>
-                  {canApproveAdminChanges ? (
+                  {canApproveAdminChanges && requiresApproval ? (
                     <button
                       type="button"
                       onClick={() => handleConfirmRequest(request)}
@@ -211,7 +218,7 @@ export default function AdminRequestsPage() {
                     </button>
                   ) : (
                     <div className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-500">
-                      მხოლოდ ნახვა
+                      {requiresApproval ? 'მხოლოდ ნახვა' : 'ინფორმაცია'}
                     </div>
                   )}
                 </div>

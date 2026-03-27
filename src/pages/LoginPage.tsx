@@ -14,7 +14,7 @@ import { AlertCircle, Chrome, ClipboardList, Mail } from 'lucide-react';
 export default function LoginPage() {
   const { authError, clearAuthError, loading: authLoading, profile, user } = useAuth();
   const [error, setError] = useState('');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -73,8 +73,8 @@ export default function LoginPage() {
       return;
     }
 
-    const normalizedEmail = normalizeEmail(email);
-    const allowedUser = getAllowedUserConfig(normalizedEmail);
+    const normalizedIdentifier = normalizeEmail(identifier);
+    const allowedUser = getAllowedUserConfig(normalizedIdentifier);
 
     if (!allowedUser) {
       setError(ACCESS_DENIED_MESSAGE);
@@ -91,10 +91,10 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      await signInWithEmailAndPassword(auth, allowedUser.email, password);
     } catch (err: any) {
       if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
-        setError('ელ-ფოსტა ან პაროლი არასწორია.');
+        setError('მომხმარებელი/ელ-ფოსტა ან პაროლი არასწორია.');
       } else if (err?.code === 'auth/user-not-found') {
         setError('ასეთი ანგარიში ვერ მოიძებნა.');
       } else if (err?.code === 'auth/operation-not-allowed') {
@@ -152,14 +152,14 @@ export default function LoginPage() {
 
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-slate-700">ელ-ფოსტა</label>
+                <label className="block text-sm font-semibold text-slate-700">მომხმარებელი ან ელ-ფოსტა</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="staff@clinic.local"
+                  type="text"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  placeholder="staff@clinic.local ან username"
                   className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -177,7 +177,7 @@ export default function LoginPage() {
             </div>
 
             <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-              რეგისტრაცია გამორთულია. თუ პაროლი არ გაქვს ან ვერ შედიხარ, მიმართე ადმინისტრატორს.
+              რეგისტრაცია გამორთულია. შეგიძლიათ შეხვიდეთ დაშვებული ელ-ფოსტით ან წინასწარ შექმნილი username-ით. თუ პაროლი არ გაქვს ან ვერ შედიხარ, მიმართე ადმინისტრატორს.
             </p>
 
             <button
