@@ -11,6 +11,7 @@ import AdminRequestsPage from './pages/AdminRequestsPage';
 import ArchivePage from './pages/ArchivePage';
 import FirebaseSetupPage from './pages/FirebaseSetupPage';
 import { isFirebaseConfigured } from './firebase';
+import { useAppVersionSync } from './useAppVersionSync';
 
 const Router = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io')
   ? HashRouter
@@ -40,6 +41,8 @@ function LoginRoute() {
 }
 
 export default function App() {
+  useAppVersionSync();
+
   if (!isFirebaseConfigured) {
     return <FirebaseSetupPage />;
   }
