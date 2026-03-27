@@ -3,7 +3,6 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { resolveUserDisplayName } from './accessControl';
 import { isArchivedRequest } from './archiveUtils';
 import { db } from './firebase';
-import { enablePushNotifications, supportsServiceWorkerNotifications, syncExistingPushNotifications } from './pushNotifications';
 import { normalizeRequestStatus, resolveRequestStatusFromRequest } from './requestStatusUtils';
 import { ClinicalRequest, UserProfile } from './types';
 
@@ -15,6 +14,7 @@ type NotificationPermissionState = NotificationPermission | 'unsupported';
 type RequestMeta = {
   finalDecision: string;
   hasPendingApproval: boolean;
+  registrarActivity: string;
   status: string;
 };
 
@@ -35,12 +35,27 @@ function supportsBrowserNotifications() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
+function isMobileNotificationsDevice() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent || '';
+  const isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent) || isTouchMac;
+}
+
+function supportsDesktopBrowserNotifications() {
+  return supportsBrowserNotifications() && !isMobileNotificationsDevice();
+}
+
 function isPageInBackground() {
   return typeof document !== 'undefined' && document.visibilityState !== 'visible';
 }
 
 function getNotificationPermission(): NotificationPermissionState {
-  if (!supportsBrowserNotifications()) {
+  if (!supportsDesktopBrowserNotifications()) {
     return 'unsupported';
   }
 
@@ -191,7 +206,7 @@ function buildDoctorStatusNotification(request: ClinicalRequest): RequestNotific
     : `სტატუსი: ${resolvedStatus}`;
 
   return {
-    title: 'პაციენტის სტატუსი განახლდა',
+    title: 'მოთხოვნა განახლდა',
     body: `${patientFullName} • ${statusSummary}`,
     requestId: request.id,
     tag: `doctor-status-${request.id}-${request.updatedAt?.seconds ?? 'now'}`,
@@ -203,6 +218,22 @@ function buildDoctorStatusNotification(request: ClinicalRequest): RequestNotific
 function isPendingAdminConfirmation(request: ClinicalRequest) {
   return request.adminConfirmationStatus === 'pending' &&
     Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
+}
+
+function getTimestampSignature(timestamp: any) {
+  if (!timestamp) {
+    return '';
+  }
+
+  if (typeof timestamp.toMillis === 'function') {
+    return String(timestamp.toMillis());
+  }
+
+  if (typeof timestamp.seconds === 'number') {
+    return String((timestamp.seconds * 1000) + Math.floor((timestamp.nanoseconds || 0) / 1000000));
+  }
+
+  return String(timestamp);
 }
 
 type UseRequestNotificationsOptions = {
@@ -282,6 +313,12 @@ export function useRequestNotifications({
           const meta: RequestMeta = {
             finalDecision: (request.finalDecision || '').trim(),
             hasPendingApproval: isPendingAdminConfirmation(request),
+            registrarActivity: [
+              getTimestampSignature(request.lastRegistrarEditAt),
+              (request.registrarComment || '').trim(),
+              (request.registrarName || '').trim(),
+              (request.formFillerName || '').trim(),
+            ].join('|'),
             status: normalizeRequestStatus(resolveRequestStatusFromRequest(request)),
           };
 
@@ -309,7 +346,11 @@ export function useRequestNotifications({
             previousRequest &&
             (
               previousRequest.status !== meta.status ||
-              previousRequest.finalDecision !== meta.finalDecision
+              previousRequest.finalDecision !== meta.finalDecision ||
+              (
+                Boolean(meta.registrarActivity) &&
+                previousRequest.registrarActivity !== meta.registrarActivity
+              )
             )
           ) {
             queuedNotifications.push(buildDoctorStatusNotification(request));
@@ -320,6 +361,10 @@ export function useRequestNotifications({
 
         if (!hasHydratedSnapshotRef.current) {
           hasHydratedSnapshotRef.current = true;
+          return;
+        }
+
+        if (!supportsDesktopBrowserNotifications()) {
           return;
         }
 
@@ -393,29 +438,18 @@ export function useRequestNotifications({
     };
   }, [inAppNotifications]);
 
-  useEffect(() => {
-    if (!profile) {
-      return;
-    }
-
-    void syncExistingPushNotifications(profile);
-  }, [profile]);
-
   const requestNotificationPermission = async () => {
-    if (!supportsBrowserNotifications()) {
+    if (!supportsDesktopBrowserNotifications()) {
       setNotificationPermission('unsupported');
       return 'unsupported';
     }
 
-    const result = await enablePushNotifications(profile);
-    const permission = result.permission;
+    const permission = await window.Notification.requestPermission();
     setNotificationPermission(permission);
 
     if (permission === 'granted') {
       const notification = new window.Notification('შეტყობინებები ჩართულია', {
-        body: supportsServiceWorkerNotifications()
-          ? 'ახლა ახალი მოთხოვნა, სტატუსის ცვლილება ან დასადასტურებელი ჩანაწერი ბრაუზერში და ჰოუმ სქრინ აპშიც შეგახსენდება.'
-          : 'ახლა ახალი მოთხოვნა, სტატუსის ცვლილება ან დასადასტურებელი ჩანაწერი ბრაუზერში შეგახსენდება.',
+        body: 'ახლა ახალი მოთხოვნა და რეგისტრატორის ცვლილებები ბრაუზერში შეგახსენდება, მაშინაც თუ სხვა თაბზე ხართ.',
         icon: NOTIFICATION_ICON_URL,
         badge: NOTIFICATION_ICON_URL,
         tag: 'notifications-enabled',
@@ -435,6 +469,6 @@ export function useRequestNotifications({
     inAppNotifications,
     notificationPermission,
     requestNotificationPermission,
-    supportsNotifications: supportsBrowserNotifications(),
+    supportsNotifications: supportsDesktopBrowserNotifications(),
   };
 }

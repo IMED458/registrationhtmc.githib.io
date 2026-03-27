@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ka } from 'date-fns/locale';
-import { Archive, CalendarDays, Clock3, Pencil, Search, Trash2 } from 'lucide-react';
+import { Archive, CalendarDays, ChevronDown, ChevronRight, Clock3, Pencil, Search, Trash2 } from 'lucide-react';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { writeAuditLogEntry } from '../auditLog';
@@ -40,6 +40,7 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingRequestId, setDeletingRequestId] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -126,10 +127,11 @@ export default function ArchivePage() {
     }
 
     return (
-      request.patientData.firstName.toLowerCase().includes(normalizedSearch) ||
-      request.patientData.lastName.toLowerCase().includes(normalizedSearch) ||
-      request.patientData.historyNumber.toLowerCase().includes(normalizedSearch) ||
-      request.patientData.personalId.toLowerCase().includes(normalizedSearch) ||
+      (request.patientData.firstName || '').toLowerCase().includes(normalizedSearch) ||
+      (request.patientData.lastName || '').toLowerCase().includes(normalizedSearch) ||
+      (request.patientData.historyNumber || '').toLowerCase().includes(normalizedSearch) ||
+      (request.patientData.personalId || '').toLowerCase().includes(normalizedSearch) ||
+      (request.patientData.insurance || '').toLowerCase().includes(normalizedSearch) ||
       normalizeRequestStatus(request.currentStatus).toLowerCase().includes(normalizedSearch) ||
       (request.finalDecision || '').toLowerCase().includes(normalizedSearch) ||
       getDiagnosisSearchText(request).toLowerCase().includes(normalizedSearch) ||
@@ -137,18 +139,47 @@ export default function ArchivePage() {
     );
   });
 
-  const groupedRequests = filteredRequests.reduce<Record<string, ClinicalRequest[]>>((groups, request) => {
-    const groupKey = getArchiveGroupKey(request) || 'unknown';
+  const groupedRequests = useMemo(
+    () => filteredRequests.reduce<Record<string, ClinicalRequest[]>>((groups, request) => {
+      const groupKey = getArchiveGroupKey(request) || 'unknown';
 
-    if (!groups[groupKey]) {
-      groups[groupKey] = [];
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey].push(request);
+      return groups;
+    }, {}),
+    [filteredRequests],
+  );
+
+  const sortedGroupKeys = useMemo(
+    () => Object.keys(groupedRequests).sort((left, right) => right.localeCompare(left)),
+    [groupedRequests],
+  );
+
+  useEffect(() => {
+    if (!sortedGroupKeys.length) {
+      return;
     }
 
-    groups[groupKey].push(request);
-    return groups;
-  }, {});
+    setExpandedGroups((current) => {
+      const nextState: Record<string, boolean> = {};
 
-  const sortedGroupKeys = Object.keys(groupedRequests).sort((left, right) => right.localeCompare(left));
+      sortedGroupKeys.forEach((groupKey, index) => {
+        nextState[groupKey] = current[groupKey] ?? index === 0;
+      });
+
+      return nextState;
+    });
+  }, [sortedGroupKeys]);
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((current) => ({
+      ...current,
+      [groupKey]: !current[groupKey],
+    }));
+  };
 
   return (
     <div className="w-full space-y-6 pb-12">
@@ -189,117 +220,129 @@ export default function ArchivePage() {
           {sortedGroupKeys.map((groupKey) => {
             const groupDate = new Date(groupKey);
             const requests = sortArchivedRequests(groupedRequests[groupKey]);
+            const isExpanded = expandedGroups[groupKey] ?? false;
 
             return (
               <section key={groupKey} className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-100/80 px-4 py-3">
-                  <div className="flex items-center gap-2 text-slate-700">
-                    <CalendarDays className="h-4 w-4 text-slate-500" />
-                    <span className="font-black">
-                      {Number.isNaN(groupDate.getTime()) ? 'თარიღი უცნობია' : formatArchiveDateLabel(groupDate)}
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold text-slate-500">
-                    {requests.length} ჩანაწერი
-                  </div>
-                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(groupKey)}
+                    className="flex w-full items-center justify-between gap-3 bg-slate-100/80 px-4 py-4 text-left transition hover:bg-slate-100"
+                  >
+                    <div className="flex items-center gap-3 text-slate-700">
+                      {isExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-slate-500" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-slate-500" />
+                      )}
+                      <CalendarDays className="h-4 w-4 text-slate-500" />
+                      <span className="font-black">
+                        {Number.isNaN(groupDate.getTime()) ? 'თარიღი უცნობია' : formatArchiveDateLabel(groupDate)}
+                      </span>
+                    </div>
+                    <div className="text-sm font-bold text-slate-500">
+                      {requests.length} ჩანაწერი
+                    </div>
+                  </button>
 
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {requests.map((request) => {
-                    const archivedAtMillis = getArchivedAtMillis(request);
-                    const deleteAtMillis = archivedAtMillis + ARCHIVE_RETENTION_MS;
+                  {isExpanded && (
+                    <div className="divide-y divide-slate-100">
+                      {requests.map((request) => {
+                        const archivedAtMillis = getArchivedAtMillis(request);
+                        const deleteAtMillis = archivedAtMillis + ARCHIVE_RETENTION_MS;
 
-                    return (
-                      <article
-                        key={request.id}
-                        className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-                      >
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="space-y-2">
-                            <div>
-                              <div className="text-lg font-black text-slate-900">
-                                {request.patientData.firstName} {request.patientData.lastName}
+                        return (
+                          <article
+                            key={request.id}
+                            className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto]"
+                          >
+                            <div className="min-w-0 space-y-2">
+                              <div>
+                                <div className="text-base font-black text-slate-900">
+                                  {request.patientData.lastName} {request.patientData.firstName}
+                                </div>
+                                <div className="mt-1 text-xs font-bold text-slate-400">
+                                  {request.patientData.historyNumber || '-'} / {request.patientData.personalId || '-'}
+                                </div>
                               </div>
-                              <div className="mt-1 text-xs font-bold text-slate-400">
-                                {request.patientData.historyNumber || '-'} / {request.patientData.personalId || '-'}
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                                  {normalizeRequestStatus(request.currentStatus)}
+                                </span>
+                                {request.finalDecision && (
+                                  <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                                    {request.finalDecision}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
-                              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-                                {normalizeRequestStatus(request.currentStatus)}
-                              </span>
-                              {request.finalDecision && (
-                                <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
-                                  {request.finalDecision}
-                                </span>
+                            <div className="min-w-0 space-y-3">
+                              <div>
+                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დაზღვევა</div>
+                                <div className="mt-1 text-sm font-bold text-slate-700">
+                                  {request.patientData.insurance || '-'}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დიაგნოზი</div>
+                                <div className="mt-1 text-sm leading-6 text-slate-700">
+                                  {getDiagnosisSearchText(request) || '-'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">არქივში გადასვლა</div>
+                                <div className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                                  <Clock3 className="h-4 w-4 text-slate-400" />
+                                  {archivedAtMillis ? formatDateTimeLabel(archivedAtMillis) : '-'}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">ავტომატური წაშლა</div>
+                                <div className="mt-1 text-sm text-slate-700">
+                                  {archivedAtMillis ? formatDateTimeLabel(deleteAtMillis) : '-'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:min-w-[180px]">
+                              <Link
+                                to={`/request/${request.id}`}
+                                className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                              >
+                                დეტალები
+                              </Link>
+                              {canEditRequest(request) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditRequest(request.id)}
+                                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 transition hover:bg-sky-100"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                  რედაქტირება
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRequest(request)}
+                                  disabled={deletingRequestId === request.id}
+                                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  {deletingRequestId === request.id ? 'იშლება...' : 'წაშლა'}
+                                </button>
                               )}
                             </div>
-                          </div>
-
-                          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:min-w-[180px]">
-                            <Link
-                              to={`/request/${request.id}`}
-                              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                            >
-                              დეტალები
-                            </Link>
-                            {canEditRequest(request) && (
-                              <button
-                                type="button"
-                                onClick={() => handleEditRequest(request.id)}
-                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 transition hover:bg-sky-100"
-                              >
-                                <Pencil className="h-4 w-4" />
-                                რედაქტირება
-                              </button>
-                            )}
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRequest(request)}
-                                disabled={deletingRequestId === request.id}
-                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                {deletingRequestId === request.id ? 'იშლება...' : 'წაშლა'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-5 grid grid-cols-1 gap-4 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2">
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">მოთხოვნა</div>
-                            <div className="mt-1 text-sm font-bold text-slate-700">{request.requestedAction || '-'}</div>
-                            {getStudyTypeSummary(request) && (
-                              <div className="mt-1 text-xs font-bold text-emerald-600">{getStudyTypeSummary(request)}</div>
-                            )}
-                          </div>
-
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დიაგნოზი</div>
-                            <div className="mt-1 text-sm text-slate-700">{getDiagnosisSearchText(request) || '-'}</div>
-                          </div>
-
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">არქივში გადასვლის დრო</div>
-                            <div className="mt-1 flex items-center gap-2 text-sm text-slate-700">
-                              <Clock3 className="h-4 w-4 text-slate-400" />
-                              {archivedAtMillis ? formatDateTimeLabel(archivedAtMillis) : '-'}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">ავტომატური წაშლა</div>
-                            <div className="mt-1 text-sm text-slate-700">
-                              {archivedAtMillis ? formatDateTimeLabel(deleteAtMillis) : '-'}
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </section>
             );
