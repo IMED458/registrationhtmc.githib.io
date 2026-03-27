@@ -106,7 +106,7 @@ export default function AdminRequestsPage() {
     <div className="w-full max-w-none space-y-8 pb-12">
       <div>
         <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">მოთხოვნები</h2>
-        <p className="text-slate-500">რეგისტრატორის დასადასტურებელი და სხვა სრული რედაქტირებების შეტყობინებები</p>
+        <p className="text-slate-500">რეგისტრატორისა და სხვა იუზერების ცვლილებების შეტყობინებები</p>
         {!canApproveAdminChanges && (
           <p className="mt-2 text-sm font-bold text-amber-700">
             ამ ანგარიშს მოთხოვნების დადასტურების უფლება არ აქვს.

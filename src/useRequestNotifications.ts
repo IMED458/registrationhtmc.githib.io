@@ -381,7 +381,7 @@ export function useRequestNotifications({
             isAdmin &&
             previousRequest &&
             previousRequest.adminFeedActivity !== meta.adminFeedActivity &&
-            (meta.hasPendingApproval || Boolean(request.pendingDoctorEdit))
+            (meta.hasPendingApproval || Boolean(request.pendingDoctorEdit) || Boolean(request.pendingRegistrarUpdate))
           ) {
             queuedNotifications.push(buildAdminNotification(request));
             return;

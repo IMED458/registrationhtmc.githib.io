@@ -102,7 +102,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               request.adminConfirmationStatus === 'pending' &&
               Boolean(request.pendingRegistrarUpdate || request.pendingDoctorEdit);
             const hasInformationalUpdate =
-              Boolean(request.pendingDoctorEdit) && !hasPendingApproval;
+              (Boolean(request.pendingDoctorEdit) || Boolean(request.pendingRegistrarUpdate)) &&
+              !hasPendingApproval;
 
           return hasPendingApproval || hasInformationalUpdate ? total + 1 : total;
         }, 0);

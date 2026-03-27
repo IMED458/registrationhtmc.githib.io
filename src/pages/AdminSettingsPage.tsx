@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
 import { REGISTRAR_EMAIL } from '../accessControl';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
@@ -26,7 +26,6 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [registrarSaving, setRegistrarSaving] = useState(false);
-  const [confirmingRequestId, setConfirmingRequestId] = useState('');
   const isRegistrarDeleted = (settings.disabledEmails ?? []).includes(REGISTRAR_EMAIL);
 
   useEffect(() => {
@@ -49,7 +48,7 @@ export default function AdminSettingsPage() {
       (snapshot) => {
         const nextRequests = snapshot.docs
           .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
-          .filter((request) => request.adminConfirmationStatus === 'pending' && request.pendingRegistrarUpdate);
+          .filter((request) => Boolean(request.pendingRegistrarUpdate));
 
         setPendingApprovals(nextRequests);
       },
@@ -151,53 +150,6 @@ export default function AdminSettingsPage() {
       );
     } finally {
       setRegistrarSaving(false);
-    }
-  };
-
-  const handleConfirmEditedRequest = async (request: ClinicalRequest) => {
-    if (!profile || confirmingRequestId || !canApproveAdminChanges) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `"${request.patientData.firstName} ${request.patientData.lastName}" ჩანაწერის რედაქტირება დადასტურდეს?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setConfirmingRequestId(request.id);
-
-    try {
-      await updateDoc(doc(db, 'requests', request.id), {
-        adminConfirmationStatus: 'confirmed',
-        adminConfirmedAt: Timestamp.now(),
-        adminConfirmedByUserId: profile.uid,
-        adminConfirmedByUserName: profile.fullName,
-        pendingRegistrarUpdate: null,
-        updatedAt: Timestamp.now(),
-      });
-
-      await writeAuditLogEntry({
-        userId: profile.uid,
-        userName: profile.fullName,
-        requestId: request.id,
-        actionType: 'UPDATE_CONFIRMED',
-        newValue: `ადმინისტრატორმა დაადასტურა ჩანაწერის რედაქტირება: ${request.patientData.firstName} ${request.patientData.lastName}`,
-        oldValue: request.pendingRegistrarUpdate?.registrarComment || undefined,
-      });
-    } catch (err) {
-      console.error(err);
-      alert(
-        getFirebaseActionErrorMessage(err, {
-          fallback: 'რედაქტირების დადასტურება ვერ მოხერხდა.',
-          permissionDenied:
-            'დადასტურება ვერ მოხერხდა, რადგან ამ ანგარიშისთვის ადმინისტრატორის write წვდომა არ არის ნებადართული.',
-        }),
-      );
-    } finally {
-      setConfirmingRequestId('');
     }
   };
 
@@ -363,12 +315,12 @@ export default function AdminSettingsPage() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-slate-600">
-                აქ ჩანს რეგისტრატორის მიერ შეცვლილი ჩანაწერები, რომლებიც ადმინისტრატორის დადასტურებას ელოდება.
+                აქ ჩანს რეგისტრატორის მიერ შეცვლილი ჩანაწერები. ეს სია საინფორმაციოა და დადასტურება აღარ სჭირდება.
               </p>
 
               {pendingApprovals.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
-                  დასადასტურებელი რედაქტირება ამჟამად არ არის.
+                  რეგისტრატორის ახალი ცვლილებები ამჟამად არ არის.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -405,20 +357,9 @@ export default function AdminSettingsPage() {
                           >
                             დეტალები
                           </button>
-                          {canApproveAdminChanges ? (
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmEditedRequest(request)}
-                              disabled={confirmingRequestId === request.id}
-                              className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                              {confirmingRequestId === request.id ? 'ინახება...' : 'დადასტურება'}
-                            </button>
-                          ) : (
-                            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-center font-bold text-slate-500">
-                              მხოლოდ ნახვა
-                            </div>
-                          )}
+                          <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-center font-bold text-slate-500">
+                            ინფორმაცია
+                          </div>
                         </div>
                       </div>
                     </div>

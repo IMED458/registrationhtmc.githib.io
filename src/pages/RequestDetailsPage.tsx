@@ -309,7 +309,14 @@ export default function RequestDetailsPage() {
 
       setRequest((current) => {
         if (current && hasRegistrarSyncChange(current, nextRequest) && !updating && !confirmAction) {
-          if (current.adminConfirmationStatus !== nextRequest.adminConfirmationStatus) {
+          if (
+            getPendingUpdateSignature(current.pendingRegistrarUpdate) !==
+              getPendingUpdateSignature(nextRequest.pendingRegistrarUpdate) &&
+            Boolean(nextRequest.pendingRegistrarUpdate) &&
+            nextRequest.adminConfirmationStatus !== 'pending'
+          ) {
+            setSyncNoticeMessage('ცვლილება ჩაიწერა და ადმინთან შეტყობინება გაიგზავნა.');
+          } else if (current.adminConfirmationStatus !== nextRequest.adminConfirmationStatus) {
             if (nextRequest.adminConfirmationStatus === 'confirmed') {
               setSyncNoticeMessage('ადმინმა ჩანაწერის ცვლილება დაადასტურა.');
             } else if (nextRequest.adminConfirmationStatus === 'pending') {
@@ -667,7 +674,7 @@ export default function RequestDetailsPage() {
           lastRegistrarEditByUserId: profile.uid,
           lastRegistrarEditByUserName: profile.fullName,
           lastRegistrarEditByUserEmail: profile.email,
-          adminConfirmationStatus: 'pending',
+          adminConfirmationStatus: null,
           adminConfirmedAt: null,
           adminConfirmedByUserId: '',
           adminConfirmedByUserName: '',
@@ -718,6 +725,7 @@ export default function RequestDetailsPage() {
           icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
           diagnoses,
           requiresRegistrarAction: true,
+          pendingRegistrarUpdate: null,
           pendingDoctorEdit: doctorNotification,
           lastDoctorEditAt: Timestamp.now(),
           lastDoctorEditByUserId: profile.uid,
@@ -828,10 +836,10 @@ export default function RequestDetailsPage() {
 
       if (request.adminConfirmationStatus === 'pending' || request.pendingRegistrarUpdate) {
         adminUpdateData.pendingRegistrarUpdate = null;
-        adminUpdateData.adminConfirmationStatus = 'confirmed';
-        adminUpdateData.adminConfirmedAt = Timestamp.now();
-        adminUpdateData.adminConfirmedByUserId = profile.uid;
-        adminUpdateData.adminConfirmedByUserName = profile.fullName;
+        adminUpdateData.adminConfirmationStatus = request.adminConfirmationStatus === 'pending' ? 'confirmed' : null;
+        adminUpdateData.adminConfirmedAt = request.adminConfirmationStatus === 'pending' ? Timestamp.now() : null;
+        adminUpdateData.adminConfirmedByUserId = request.adminConfirmationStatus === 'pending' ? profile.uid : '';
+        adminUpdateData.adminConfirmedByUserName = request.adminConfirmationStatus === 'pending' ? profile.fullName : '';
       }
 
       await updateDoc(requestRef, adminUpdateData);
@@ -1276,12 +1284,22 @@ export default function RequestDetailsPage() {
                 </div>
                 <div>
                   <div className="text-xs text-slate-400 uppercase font-bold">ადმინის დადასტურება</div>
-                  <div className={`font-bold ${request.adminConfirmationStatus === 'pending' ? 'text-amber-700' : request.adminConfirmationStatus === 'confirmed' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  <div className={`font-bold ${
+                    request.adminConfirmationStatus === 'pending'
+                      ? 'text-amber-700'
+                      : request.adminConfirmationStatus === 'confirmed'
+                        ? 'text-emerald-700'
+                        : request.pendingRegistrarUpdate
+                          ? 'text-sky-700'
+                          : 'text-slate-500'
+                  }`}>
                     {request.adminConfirmationStatus === 'pending'
                       ? 'ელოდება დადასტურებას'
                       : request.adminConfirmationStatus === 'confirmed'
                         ? 'დადასტურებულია'
-                        : '-'}
+                        : request.pendingRegistrarUpdate
+                          ? 'ინფორმაციისთვის გაიგზავნა'
+                          : '-'}
                   </div>
                 </div>
                 {request.lastDoctorEditAt && (
