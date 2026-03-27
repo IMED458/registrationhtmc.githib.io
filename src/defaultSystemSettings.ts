@@ -8,6 +8,7 @@ export const DEFAULT_GOOGLE_SHEET_URL =
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   googleSheetsId: DEFAULT_GOOGLE_SHEET_URL,
+  googleAppsScriptUrl: '',
   googleDriveFolderId: '',
   sheetName: '',
   sheetGid: '',

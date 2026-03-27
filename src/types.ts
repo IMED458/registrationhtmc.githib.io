@@ -110,6 +110,7 @@ export interface AuditLog {
 
 export interface SystemSettings {
   googleSheetsId: string;
+  googleAppsScriptUrl?: string;
   googleDriveFolderId?: string;
   sheetName?: string;
   sheetGid?: string;

@@ -37,3 +37,16 @@
 - Firebase Functions deploy: `npm run deploy:functions`
 
 თუ პაციენტის ძებნა უნდა კითხულობდეს დაცულ Google Sheet-ს, backend გარემოში დაამატეთ `GOOGLE_SERVICE_ACCOUNT_JSON` ან გაუზიარეთ Sheet შესაბამის Google service account-ს.
+
+## უფასო Google Apps Script sync
+
+- მზა Apps Script ფაილი დევს `scripts/google-apps-script-sync.gs`
+- Google Sheet-თან უფასო ჩაწერისთვის შექმენით `Apps Script` ამ ფაილის კოდით
+- Deploy -> `New deployment` -> `Web app`
+- `Execute as`: `Me`
+- `Who has access`: `Anyone`
+- მიღებული `.../exec` ბმული ჩასვით ადმინის გვერდზე ველში `Google Apps Script Web App URL`
+
+ამის შემდეგ live საიტიდან მოთხოვნის შექმნისას და რედაქტირებისას:
+- ICD კოდი ჩაიწერება `H` სვეტში
+- `ბინა` ან განყოფილება, მაგალითად `კარდიოლოგია`, ჩაიწერება `I` სვეტში

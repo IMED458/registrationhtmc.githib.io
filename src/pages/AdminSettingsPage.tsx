@@ -243,6 +243,19 @@ export default function AdminSettingsPage() {
                 </p>
               </div>
               <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Google Apps Script Web App URL</label>
+                <input
+                  type="text"
+                  disabled={!canEditAdminContent}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  value={settings.googleAppsScriptUrl || ''}
+                  onChange={(e) => setSettings({ ...settings, googleAppsScriptUrl: e.target.value })}
+                />
+                <p className="text-xs text-slate-400">
+                  უფასო სინქისთვის ჩასვით Apps Script-ის `exec` ბმული. ეს გამოიყენება H და I სვეტების ჩასაწერად.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">Sheet-ის სახელი</label>
                 <input
                   type="text"
