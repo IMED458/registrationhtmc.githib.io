@@ -156,23 +156,26 @@ export default function ArchivePage() {
     }
   };
 
-  const filteredRequests = archivedRequests.filter((request) => {
-    if (!normalizedSearch) {
-      return true;
-    }
+  const filteredRequests = useMemo(
+    () => archivedRequests.filter((request) => {
+      if (!normalizedSearch) {
+        return true;
+      }
 
-    return (
-      (request.patientData.firstName || '').toLowerCase().includes(normalizedSearch) ||
-      (request.patientData.lastName || '').toLowerCase().includes(normalizedSearch) ||
-      (request.patientData.historyNumber || '').toLowerCase().includes(normalizedSearch) ||
-      (request.patientData.personalId || '').toLowerCase().includes(normalizedSearch) ||
-      (request.patientData.insurance || '').toLowerCase().includes(normalizedSearch) ||
-      normalizeRequestStatus(request.currentStatus).toLowerCase().includes(normalizedSearch) ||
-      (request.finalDecision || '').toLowerCase().includes(normalizedSearch) ||
-      getDiagnosisSearchText(request).toLowerCase().includes(normalizedSearch) ||
-      getStudyTypeSummary(request).toLowerCase().includes(normalizedSearch)
-    );
-  });
+      return (
+        (request.patientData.firstName || '').toLowerCase().includes(normalizedSearch) ||
+        (request.patientData.lastName || '').toLowerCase().includes(normalizedSearch) ||
+        (request.patientData.historyNumber || '').toLowerCase().includes(normalizedSearch) ||
+        (request.patientData.personalId || '').toLowerCase().includes(normalizedSearch) ||
+        (request.patientData.insurance || '').toLowerCase().includes(normalizedSearch) ||
+        normalizeRequestStatus(request.currentStatus).toLowerCase().includes(normalizedSearch) ||
+        (request.finalDecision || '').toLowerCase().includes(normalizedSearch) ||
+        getDiagnosisSearchText(request).toLowerCase().includes(normalizedSearch) ||
+        getStudyTypeSummary(request).toLowerCase().includes(normalizedSearch)
+      );
+    }),
+    [archivedRequests, normalizedSearch],
+  );
 
   const groupedRequests = useMemo(
     () => filteredRequests.reduce<Record<string, ClinicalRequest[]>>((groups, request) => {
@@ -200,12 +203,22 @@ export default function ArchivePage() {
 
     setExpandedGroups((current) => {
       const nextState: Record<string, boolean> = {};
+      let hasChanges = false;
 
       sortedGroupKeys.forEach((groupKey, index) => {
-        nextState[groupKey] = current[groupKey] ?? index === 0;
+        const nextValue = current[groupKey] ?? index === 0;
+        nextState[groupKey] = nextValue;
+
+        if (current[groupKey] !== nextValue) {
+          hasChanges = true;
+        }
       });
 
-      return nextState;
+      if (Object.keys(current).length !== Object.keys(nextState).length) {
+        hasChanges = true;
+      }
+
+      return hasChanges ? nextState : current;
     });
   }, [sortedGroupKeys]);
 
