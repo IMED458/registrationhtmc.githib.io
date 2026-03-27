@@ -667,14 +667,14 @@ export default function RequestDetailsPage() {
           diagnosis: representativeDiagnosis?.diagnosis || '',
           icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
           diagnoses,
-          requiresRegistrarAction: false,
+          requiresRegistrarAction: true,
           pendingDoctorEdit: doctorNotification,
           lastDoctorEditAt: Timestamp.now(),
           lastDoctorEditByUserId: profile.uid,
           lastDoctorEditByUserName: profile.fullName,
           lastDoctorEditByUserEmail: profile.email,
           lastDoctorEditComment: formData.doctorEditComment.trim(),
-          adminConfirmationStatus: 'pending',
+          adminConfirmationStatus: null,
           adminConfirmedAt: null,
           adminConfirmedByUserId: '',
           adminConfirmedByUserName: '',
@@ -811,7 +811,7 @@ export default function RequestDetailsPage() {
             : isRegistrarOnly
               ? 'ცვლილება დაუყოვნებლივ შეინახება და ადმინთან შეტყობინებაც გაიგზავნება. გაგრძელება გსურთ?'
             : canDoctorEdit
-              ? 'პაციენტის მონაცემები და დიაგნოზი დაუყოვნებლივ განახლდება, ჩანაწერი რედაქტირებულად მოინიშნება და ადმინთან შეტყობინება გაიგზავნება. გაგრძელება გსურთ?'
+              ? 'პაციენტის მონაცემები და დიაგნოზი დაუყოვნებლივ განახლდება, რეგისტრატორთან გამოჩნდება და ადმინთან ინფორმაციაც გაიგზავნება. გაგრძელება გსურთ?'
               : isAdmin && isEditing
                 ? 'ადმინისტრატორის სრული რედაქტირება დაუყოვნებლივ შეინახება. გაგრძელება გსურთ?'
                 : 'ნამდვილად გსურთ სტატუსის განახლება?',
@@ -999,7 +999,7 @@ export default function RequestDetailsPage() {
             <div className="space-y-4 p-4 sm:p-6">
               {isDoctorInlineEditing && (
                 <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
-                  ექიმის/ექთნის ცვლილება მაშინვე შეინახება, მაგრამ რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა. კომენტარი სავალდებულოა.
+                  ცვლილება მაშინვე შეინახება, რეგისტრატორთან გამოჩნდება როგორც ხელახლა დასამუშავებელი მოთხოვნა და ადმინისტრატორსაც ინფორმაციად გაეგზავნება. კომენტარი სავალდებულოა.
                 </div>
               )}
 
