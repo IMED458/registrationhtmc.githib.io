@@ -134,7 +134,6 @@ function getRequestPriority(request: ClinicalRequest) {
   const displayStatus = normalizeRequestStatus(resolveRequestStatusFromRequest(request));
 
   if (
-    Boolean(request.requiresRegistrarAction) ||
     displayStatus === 'ახალი' ||
     displayStatus === 'განხილვაშია' ||
     displayStatus === 'თანხმდება დაზღვევასთან'
