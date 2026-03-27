@@ -8,6 +8,10 @@ type WorkbookSheetRows = {
 
 const workbookSheetsPromiseByKey = new Map<string, Promise<WorkbookSheetRows[]>>();
 
+type LookupPatientOptions = {
+  forceRefresh?: boolean;
+};
+
 function extractSpreadsheetId(value: string) {
   const trimmedValue = value.trim();
   const match = trimmedValue.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
@@ -100,10 +104,14 @@ function mapPatientFromRows(
   };
 }
 
-async function fetchWorkbookSheets(settings: SystemSettings) {
+async function fetchWorkbookSheets(settings: SystemSettings, options?: LookupPatientOptions) {
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const preferredSheetName = settings.sheetName?.trim() || '';
   const cacheKey = `${spreadsheetId}::${preferredSheetName || '*'}`;
+
+  if (options?.forceRefresh) {
+    workbookSheetsPromiseByKey.delete(cacheKey);
+  }
 
   let workbookSheetsPromise = workbookSheetsPromiseByKey.get(cacheKey);
 
@@ -144,9 +152,10 @@ export async function lookupPatientFromSheet(
   input: Partial<SystemSettings> | null | undefined,
   historyNumber: string,
   personalId: string,
+  options?: LookupPatientOptions,
 ) {
   const settings = normalizeSystemSettings(input);
-  const workbookSheets = await fetchWorkbookSheets(settings);
+  const workbookSheets = await fetchWorkbookSheets(settings, options);
 
   for (const sheet of workbookSheets) {
     const patient = mapPatientFromRows(sheet.rows, settings, historyNumber, personalId);

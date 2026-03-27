@@ -436,7 +436,10 @@ export default function Dashboard() {
             ჩანაწერები არ მოიძებნა
           </div>
         ) : (
-          filteredRequests.map((req) => (
+          filteredRequests.map((req) => {
+            const displayStatus = getDisplayStatus(req);
+
+            return (
             <div
               key={req.id}
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -457,10 +460,10 @@ export default function Dashboard() {
                 </div>
                 <span className={cn(
                   "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
-                  getStatusColor(req.currentStatus)
+                  getStatusColor(displayStatus)
                 )}>
-                  {getStatusIcon(req.currentStatus)}
-                  {getDisplayStatus(req)}
+                  {getStatusIcon(displayStatus)}
+                  {displayStatus}
                 </span>
               </div>
 
@@ -545,21 +548,21 @@ export default function Dashboard() {
               {isRegistrar && canRegistrarCompleteRequest(req) && (
                 <label
                   className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700"
-                  title={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
+                  title={displayStatus === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
                 >
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    checked={getDisplayStatus(req) === 'დასრულებულია'}
-                    disabled={getDisplayStatus(req) === 'დასრულებულია' || completingRequestId === req.id}
+                    checked={displayStatus === 'დასრულებულია'}
+                    disabled={displayStatus === 'დასრულებულია' || completingRequestId === req.id}
                     onChange={() => handleMarkRequestCompleted(req)}
-                    aria-label={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
+                    aria-label={displayStatus === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
                   />
                   {completingRequestId === req.id && <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />}
                 </label>
               )}
             </div>
-          ))
+          )})
         )}
       </div>
 
@@ -593,7 +596,10 @@ export default function Dashboard() {
                   </td>
                 </tr>
               ) : (
-                filteredRequests.map((req) => (
+                filteredRequests.map((req) => {
+                  const displayStatus = getDisplayStatus(req);
+
+                  return (
                   <tr key={req.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className={`font-bold ${getPatientNameTextClass(req)}`}>{req.patientData.firstName} {req.patientData.lastName}</div>
@@ -635,10 +641,10 @@ export default function Dashboard() {
                       <div className="space-y-2">
                         <span className={cn(
                           "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border",
-                          getStatusColor(req.currentStatus)
+                          getStatusColor(displayStatus)
                         )}>
-                          {getStatusIcon(req.currentStatus)}
-                          {getDisplayStatus(req)}
+                          {getStatusIcon(displayStatus)}
+                          {displayStatus}
                         </span>
                         {req.finalDecision && (
                           <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
@@ -662,15 +668,15 @@ export default function Dashboard() {
                         {isRegistrar && canRegistrarCompleteRequest(req) && (
                           <label
                             className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
-                            title={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
+                            title={displayStatus === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
                           >
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                              checked={getDisplayStatus(req) === 'დასრულებულია'}
-                              disabled={getDisplayStatus(req) === 'დასრულებულია' || completingRequestId === req.id}
+                              checked={displayStatus === 'დასრულებულია'}
+                              disabled={displayStatus === 'დასრულებულია' || completingRequestId === req.id}
                               onChange={() => handleMarkRequestCompleted(req)}
-                              aria-label={getDisplayStatus(req) === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
+                              aria-label={displayStatus === 'დასრულებულია' ? 'დასრულებულია' : 'დასრულებულად მონიშვნა'}
                             />
                             {completingRequestId === req.id && <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />}
                           </label>
@@ -708,7 +714,7 @@ export default function Dashboard() {
                       </div>
                     </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>

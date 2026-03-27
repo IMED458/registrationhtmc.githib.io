@@ -6,6 +6,7 @@ import { auth, db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useArchiveMaintenance } from '../useArchiveMaintenance';
 import { InAppNotification, useRequestNotifications } from '../useRequestNotifications';
+import { useSheetPatientBackfill } from '../useSheetPatientBackfill';
 import { Archive, BellRing, ChevronLeft, ChevronRight, ClipboardList, FilePlus, LayoutDashboard, LogOut, Settings, ShieldCheck, Stethoscope, User, X } from 'lucide-react';
 import { ClinicalRequest } from '../types';
 
@@ -65,6 +66,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
 
   useArchiveMaintenance(Boolean(profile));
+  useSheetPatientBackfill(Boolean(profile && canCreateRequests && !isRegistrar));
 
   const {
     dismissInAppNotification,

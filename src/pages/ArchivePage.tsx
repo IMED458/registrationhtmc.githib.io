@@ -281,7 +281,7 @@ export default function ArchivePage() {
                             <div className="min-w-0 space-y-3">
                               <div>
                                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">დაზღვევა</div>
-                                <div className="mt-1 text-sm font-bold text-slate-700">
+                                <div className="mt-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
                                   {request.patientData.insurance || '-'}
                                 </div>
                               </div>

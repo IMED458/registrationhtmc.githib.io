@@ -494,6 +494,7 @@ export default function NewRequestPage() {
         settings,
         formData.historyNumber,
         formData.personalId,
+        { forceRefresh: true },
       );
 
       if (directPatient) {
@@ -920,43 +921,19 @@ export default function NewRequestPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">დაბადების თარიღი</label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                />
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <label className="text-sm font-black text-amber-900">დაზღვევა</label>
+                <span className="text-xs font-black text-amber-700">
+                  Excel-იდან პირადი ნომერი და დაზღვევა ავტომატურად ახლდება ისტორიის ნომრით
+                </span>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">დაზღვევა</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.insurance}
-                  onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">ტელეფონი</label>
-                <input
-                  type="tel"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">მისამართი</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                />
-              </div>
+              <input
+                type="text"
+                className="mt-3 w-full rounded-xl border border-amber-300 bg-white px-4 py-2 text-amber-950 outline-none transition focus:ring-2 focus:ring-amber-400"
+                value={formData.insurance}
+                onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
+              />
             </div>
           </div>
         </div>

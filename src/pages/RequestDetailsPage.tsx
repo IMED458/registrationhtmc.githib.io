@@ -954,12 +954,14 @@ export default function RequestDetailsPage() {
                 {isDoctorInlineEditing ? (
                   <input
                     type="text"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-amber-950 outline-none focus:ring-2 focus:ring-amber-400"
                     value={formData.insurance}
                     onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
                   />
                 ) : (
-                  <div className="text-slate-700">{request.patientData.insurance || '-'}</div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 font-bold text-amber-900">
+                    {request.patientData.insurance || '-'}
+                  </div>
                 )}
               </div>
               <div>
@@ -1326,7 +1328,7 @@ export default function RequestDetailsPage() {
                           <label className="text-sm font-bold text-slate-700">დაზღვევა</label>
                           <input
                             type="text"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-amber-950 outline-none focus:ring-2 focus:ring-amber-400"
                             value={formData.insurance}
                             onChange={(e) => setFormData({ ...formData, insurance: e.target.value })}
                           />
