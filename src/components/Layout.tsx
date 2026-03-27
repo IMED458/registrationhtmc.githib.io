@@ -124,6 +124,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )
     : null;
 
+  const desktopSidebarWidthClass = isSidebarCollapsed ? 'md:w-20' : 'md:w-60';
+  const desktopMainOffsetClass = isSidebarCollapsed ? 'md:ml-20' : 'md:ml-60';
+
   const navItemClassName = ({ isActive }: { isActive: boolean }) =>
     `flex items-center rounded-lg px-3 py-2 font-medium transition-colors ${
       isActive
@@ -222,11 +225,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex flex-1 w-full min-h-0 overflow-hidden">
+      <div className="flex flex-1 w-full min-h-0">
         <aside
-          className={`relative z-20 hidden border-r border-slate-200 bg-white p-3 transition-all duration-200 md:sticky md:top-16 md:block md:h-[calc(100vh-4rem)] md:shrink-0 ${
-            isSidebarCollapsed ? 'md:w-20' : 'md:w-60'
-          }`}
+          className={`relative z-20 hidden border-r border-slate-200 bg-white p-3 transition-all duration-200 md:fixed md:inset-y-16 md:left-0 md:block ${desktopSidebarWidthClass}`}
         >
           <div className={`mb-4 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between gap-3'}`}>
             {!isSidebarCollapsed && (
@@ -315,7 +316,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </aside>
 
-        <main className="relative z-0 flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 pb-24 sm:p-6 sm:pb-28 lg:p-8 lg:pb-8">
+        <main className={`relative z-0 flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 pb-24 sm:p-6 sm:pb-28 lg:p-8 lg:pb-8 ${desktopMainOffsetClass}`}>
           {children}
         </main>
       </div>
