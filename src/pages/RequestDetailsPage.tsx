@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { doc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
@@ -300,8 +300,67 @@ export default function RequestDetailsPage() {
       return;
     }
 
+    let isDisposed = false;
+    const requestRef = doc(db, 'requests', id);
+
+    const applyRequestData = (requestDocId: string, data: ClinicalRequest) => {
+      const nextRequest = { ...data, id: requestDocId };
+
+      setRequest((current) => {
+        if (current && hasRegistrarSyncChange(current, nextRequest) && !updating && !confirmAction) {
+          if (current.adminConfirmationStatus !== nextRequest.adminConfirmationStatus) {
+            if (nextRequest.adminConfirmationStatus === 'confirmed') {
+              setSyncNoticeMessage('ადმინმა ჩანაწერის ცვლილება დაადასტურა.');
+            } else if (nextRequest.adminConfirmationStatus === 'pending') {
+              setSyncNoticeMessage('ცვლილება ჩაიწერა და ადმინთან შეტყობინება გაიგზავნა.');
+            }
+          } else {
+            setSyncNoticeMessage('ჩანაწერი realtime რეჟიმში განახლდა.');
+          }
+        }
+
+        return nextRequest;
+      });
+
+      if (!updating && !confirmAction && !isEditing) {
+        setFormData(buildFormDataFromRequest(data, profile?.fullName));
+      }
+
+      setLoading(false);
+    };
+
+    const syncRequestOnce = async () => {
+      try {
+        const requestSnap = await getDoc(requestRef);
+
+        if (isDisposed) {
+          return;
+        }
+
+        if (!requestSnap.exists()) {
+          setRequest(null);
+          setLoading(false);
+          return;
+        }
+
+        applyRequestData(requestSnap.id, requestSnap.data() as ClinicalRequest);
+      } catch (error) {
+        console.error('Request fallback sync failed:', error);
+      }
+    };
+
+    const refreshVisibleRequest = () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
+      void syncRequestOnce();
+    };
+
+    void syncRequestOnce();
+
     const unsubscribe = onSnapshot(
-      doc(db, 'requests', id),
+      requestRef,
       (docSnap) => {
         if (!docSnap.exists()) {
           setRequest(null);
@@ -309,30 +368,7 @@ export default function RequestDetailsPage() {
           return;
         }
 
-        const data = docSnap.data() as ClinicalRequest;
-        const nextRequest = { ...data, id: docSnap.id };
-
-        setRequest((current) => {
-          if (current && hasRegistrarSyncChange(current, nextRequest) && !updating && !confirmAction) {
-            if (current.adminConfirmationStatus !== nextRequest.adminConfirmationStatus) {
-              if (nextRequest.adminConfirmationStatus === 'confirmed') {
-                setSyncNoticeMessage('ადმინმა ჩანაწერის ცვლილება დაადასტურა.');
-              } else if (nextRequest.adminConfirmationStatus === 'pending') {
-                setSyncNoticeMessage('ცვლილება ჩაიწერა და ადმინთან შეტყობინება გაიგზავნა.');
-              }
-            } else {
-              setSyncNoticeMessage('ჩანაწერი realtime რეჟიმში განახლდა.');
-            }
-          }
-
-          return nextRequest;
-        });
-
-        if (!updating && !confirmAction && !isEditing) {
-          setFormData(buildFormDataFromRequest(data, profile?.fullName));
-        }
-
-        setLoading(false);
+        applyRequestData(docSnap.id, docSnap.data() as ClinicalRequest);
       },
       (error) => {
         console.error('Request sync error:', error);
@@ -340,7 +376,20 @@ export default function RequestDetailsPage() {
       },
     );
 
-    return unsubscribe;
+    const intervalId = window.setInterval(() => {
+      void syncRequestOnce();
+    }, 5000);
+
+    window.addEventListener('focus', refreshVisibleRequest);
+    document.addEventListener('visibilitychange', refreshVisibleRequest);
+
+    return () => {
+      isDisposed = true;
+      unsubscribe();
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleRequest);
+      document.removeEventListener('visibilitychange', refreshVisibleRequest);
+    };
   }, [confirmAction, id, isEditing, profile?.fullName, updating]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Timestamp, collection, deleteDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { Timestamp, collection, deleteDoc, doc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { resolveUserDisplayName } from '../accessControl';
@@ -145,6 +145,10 @@ function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
   );
 }
 
+function normalizeRequestCollection(docs: ClinicalRequest[]) {
+  return sortRequestsByCreatedAt(docs.filter((request) => !isArchivedRequest(request)));
+}
+
 function DiagnosisList({ request }: { request: ClinicalRequest }) {
   const diagnoses = getDiagnosisEntries(request);
 
@@ -197,16 +201,48 @@ export default function Dashboard() {
 
     setLoading(true);
     setRequestsError('');
+    let isDisposed = false;
+    const requestsCollection = collection(db, 'requests');
+
+    const applyRequests = (docs: ClinicalRequest[]) => {
+      if (isDisposed) {
+        return;
+      }
+
+      setRequests(normalizeRequestCollection(docs));
+      setRequestsError('');
+      setLoading(false);
+    };
+
+    const syncRequestsOnce = async () => {
+      try {
+        const snapshot = await getDocs(requestsCollection);
+        const docs = snapshot.docs.map(
+          (requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest),
+        );
+        applyRequests(docs);
+      } catch (error) {
+        console.error('Request fallback sync failed:', error);
+      }
+    };
+
+    const refreshVisibleRequests = () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
+      void syncRequestsOnce();
+    };
+
+    void syncRequestsOnce();
 
     const unsubscribe = onSnapshot(
-      collection(db, 'requests'),
+      requestsCollection,
       (snapshot) => {
-        const docs = snapshot.docs
-          .map((requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest))
-          .filter((request) => !isArchivedRequest(request));
-        setRequests(sortRequestsByCreatedAt(docs));
-        setRequestsError('');
-        setLoading(false);
+        const docs = snapshot.docs.map(
+          (requestDoc) => ({ id: requestDoc.id, ...requestDoc.data() } as ClinicalRequest),
+        );
+        applyRequests(docs);
       },
       (error) => {
         console.error('Firestore Error:', error);
@@ -221,7 +257,20 @@ export default function Dashboard() {
       },
     );
 
-    return unsubscribe;
+    const intervalId = window.setInterval(() => {
+      void syncRequestsOnce();
+    }, 5000);
+
+    window.addEventListener('focus', refreshVisibleRequests);
+    document.addEventListener('visibilitychange', refreshVisibleRequests);
+
+    return () => {
+      isDisposed = true;
+      unsubscribe();
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshVisibleRequests);
+      document.removeEventListener('visibilitychange', refreshVisibleRequests);
+    };
   }, [profile]);
 
   const filteredRequests = requests.filter(req => {
