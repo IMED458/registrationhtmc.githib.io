@@ -452,11 +452,6 @@ export default function Dashboard() {
                   <div className="mt-1 text-xs text-slate-400">
                     {req.patientData.historyNumber} / {req.patientData.personalId}
                   </div>
-                  {needsRegistrarRework(req) && (
-                    <div className="mt-1 text-xs font-bold text-sky-600">
-                      ჩანაწერი შეიცვალა და ელოდება ახლიდან მოქმედებას
-                    </div>
-                  )}
                 </div>
                 <span className={cn(
                   "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
@@ -506,14 +501,6 @@ export default function Dashboard() {
                     <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">საბოლოო გადაწყვეტილება</div>
                     <div className={`mt-1 text-sm font-bold leading-5 ${getFinalDecisionTextClass(req.finalDecision)}`}>
                       {req.finalDecision}
-                    </div>
-                  </div>
-                )}
-                {needsRegistrarRework(req) && (
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-sky-600">ახალი ცვლილება</div>
-                    <div className="mt-1 text-sm font-bold text-sky-600">
-                      ჩანაწერი შეიცვალა და რეგისტრატორის მოქმედებას ელოდება
                     </div>
                   </div>
                 )}
@@ -603,11 +590,6 @@ export default function Dashboard() {
                   <tr key={req.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className={`font-bold ${getPatientNameTextClass(req)}`}>{req.patientData.firstName} {req.patientData.lastName}</div>
-                      {needsRegistrarRework(req) && (
-                        <div className="mt-1 text-xs font-bold text-sky-600">
-                          ჩანაწერი შეიცვალა და ელოდება ახლიდან მოქმედებას
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="max-w-xs">
@@ -649,11 +631,6 @@ export default function Dashboard() {
                         {req.finalDecision && (
                           <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
                             {req.finalDecision}
-                          </div>
-                        )}
-                        {needsRegistrarRework(req) && (
-                          <div className="max-w-xs text-sm font-bold leading-5 whitespace-normal text-sky-600">
-                            ცვლილება რეგისტრატორის ხელახლა მოქმედებას ელოდება
                           </div>
                         )}
                       </div>

@@ -1236,6 +1236,16 @@ export default function RequestDetailsPage() {
                     </div>
                   </>
                 )}
+                {pendingDoctorEdit && (
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-slate-400 uppercase font-bold">დეტალური ინფორმაცია</div>
+                    <div className="mt-1 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 font-bold text-sky-700">
+                      {request.adminConfirmationStatus === 'pending'
+                        ? 'ჩანაწერი შეიცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
+                        : 'ჩანაწერი შეიცვალა და რეგისტრატორის შემდგომ მოქმედებას ელოდება.'}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1749,15 +1759,13 @@ export default function RequestDetailsPage() {
                 <h3 className="font-bold text-sky-900">სრული რედაქტირება</h3>
               </div>
               <div className="space-y-4 p-4 sm:p-6">
-                <p className="text-sm leading-6 text-sky-900">
-                  {isRegistrar || isAdmin
-                    ? request.adminConfirmationStatus === 'pending'
-                      ? 'ჩანაწერი შეიცვალა და ახლა ადმინისტრატორის დადასტურებას ელოდება.'
-                      : 'ჩანაწერი შეიცვალა და რეგისტრატორის შემდგომ მოქმედებას ელოდება.'
-                    : request.adminConfirmationStatus === 'pending'
+                {!(isRegistrar || isAdmin) && (
+                  <p className="text-sm leading-6 text-sky-900">
+                    {request.adminConfirmationStatus === 'pending'
                       ? 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან დადასტურების შეტყობინება გაიგზავნა.'
                       : 'თქვენი ცვლილება ჩაიწერა და ადმინისტრატორთან ინფორმაციისთვის გაიგზავნა.'}
-                </p>
+                  </p>
+                )}
                 <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   <div>
                     <div className="text-xs font-bold uppercase text-sky-700">რედაქტორი</div>
