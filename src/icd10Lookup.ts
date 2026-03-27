@@ -15,6 +15,10 @@ type IcdDataset = {
   entries: IndexedIcdEntry[];
 };
 
+const CUSTOM_ICD_ENTRIES: Record<string, string> = {
+  'ER-0': 'პაციენტი უარს აცხადებს გამოკვლევებზე',
+};
+
 let datasetPromise: Promise<IcdDataset> | null = null;
 
 async function loadIcdDataset() {
@@ -33,6 +37,23 @@ async function loadIcdDataset() {
 
         byCode.set(code, name);
         entries.push({
+          code,
+          name,
+          searchCode: code,
+          searchName: name.toLowerCase(),
+        });
+      });
+
+      Object.entries(CUSTOM_ICD_ENTRIES).forEach(([rawCode, rawName]) => {
+        const code = extractClinicalIcdCode(rawCode);
+        const name = String(rawName || '').trim();
+
+        if (!code || !name || byCode.has(code)) {
+          return;
+        }
+
+        byCode.set(code, name);
+        entries.unshift({
           code,
           name,
           searchCode: code,

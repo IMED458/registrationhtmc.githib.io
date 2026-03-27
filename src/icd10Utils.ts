@@ -48,8 +48,14 @@ export function normalizeIcdCode(value: string | undefined) {
 
 export function extractClinicalIcdCode(value: string | undefined) {
   const normalizedValue = normalizeIcdCode(value);
-  const match = normalizedValue.match(/[A-Z][0-9]{2}(?:\.[A-Z0-9]+)?/);
-  return match?.[0] || '';
+  const standardMatch = normalizedValue.match(/[A-Z][0-9]{2}(?:\.[A-Z0-9]+)?/);
+
+  if (standardMatch?.[0]) {
+    return standardMatch[0];
+  }
+
+  const customMatch = normalizedValue.match(/[A-Z]{2,5}-[A-Z0-9]+/);
+  return customMatch?.[0] || '';
 }
 
 type DiagnosisValue = Pick<
