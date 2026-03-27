@@ -922,12 +922,7 @@ export default function NewRequestPage() {
             </div>
 
             <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <label className="text-sm font-black text-amber-900">დაზღვევა</label>
-                <span className="text-xs font-black text-amber-700">
-                  Excel-იდან პირადი ნომერი და დაზღვევა ავტომატურად ახლდება ისტორიის ნომრით
-                </span>
-              </div>
+              <label className="text-sm font-black text-amber-900">დაზღვევა</label>
               <input
                 type="text"
                 className="mt-3 w-full rounded-xl border border-amber-300 bg-white px-4 py-2 text-amber-950 outline-none transition focus:ring-2 focus:ring-amber-400"
