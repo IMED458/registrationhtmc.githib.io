@@ -53,12 +53,10 @@ export default function LoginPage() {
 
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      if (err?.code === 'auth/unauthorized-domain') {
-        setError('Google ავტორიზაციისთვის Firebase Console-ში დაამატე Authorized domain: imed458.github.io');
-      } else if (err?.code === 'auth/popup-blocked') {
-        setError('ბრაუზერმა popup დაბლოკა. სცადე თავიდან ან გამოიყენე ელ-ფოსტით შესვლა.');
-      } else if (err?.code !== 'auth/popup-closed-by-user') {
-        setError('Google-ით ავტორიზაცია ვერ მოხერხდა. სცადე თავიდან ან გამოიყენე ელ-ფოსტით შესვლა.');
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setError('');
+      } else {
+        setError('შესვლა ვერ მოხერხდა.');
       }
 
       console.error(err);
@@ -136,19 +134,8 @@ export default function LoginPage() {
             className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 rounded-xl transition-all shadow-sm disabled:opacity-50"
           >
             <Chrome className="w-5 h-5 text-blue-500" />
-            {loading || authLoading ? 'მიმდინარეობს...' : 'Google-ით შესვლა'}
+            {loading || authLoading ? 'მიმდინარეობს...' : 'შესვლა'}
           </button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                ან ელ-ფოსტით
-              </span>
-            </div>
-          </div>
 
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="space-y-2">
@@ -176,17 +163,13 @@ export default function LoginPage() {
               />
             </div>
 
-            <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-              რეგისტრაცია გამორთულია. შეგიძლიათ შეხვიდეთ დაშვებული ელ-ფოსტით ან წინასწარ შექმნილი username-ით. თუ პაროლი არ გაქვს ან ვერ შედიხარ, მიმართე ადმინისტრატორს.
-            </p>
-
             <button
               type="button"
               onClick={handleEmailAuth}
               disabled={loading || authLoading}
               className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading || authLoading ? 'მიმდინარეობს...' : 'შესვლა ელ-ფოსტით'}
+              {loading || authLoading ? 'მიმდინარეობს...' : 'შესვლა'}
             </button>
           </div>
         </div>
