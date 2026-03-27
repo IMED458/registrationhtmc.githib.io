@@ -30,12 +30,17 @@ export function resolveRequestStatus(
   const normalizedRequestedAction = String(requestedAction || '').trim();
   const normalizedDepartment = String(department || '').trim();
   const normalizedFinalDecision = String(finalDecision || '').trim();
+  const normalizedCurrentStatus = normalizeRequestStatus(currentStatus || '');
 
   if (normalizedRequestedAction === 'სტაციონარი' || normalizedDepartment) {
     return 'დასრულებულია' as RequestStatus;
   }
 
-  return FINAL_DECISION_STATUS_MAP[normalizedFinalDecision] || currentStatus;
+  return (
+    (normalizedCurrentStatus as RequestStatus) ||
+    FINAL_DECISION_STATUS_MAP[normalizedFinalDecision] ||
+    'ახალი'
+  );
 }
 
 export function resolveRequestStatusFromFinalDecision(
