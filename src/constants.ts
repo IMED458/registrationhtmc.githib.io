@@ -17,7 +17,6 @@ export const STUDY_TYPE_OPTIONS = [
 ];
 
 export const CONSENT_STATUSES = [
-  'თანახმაა',
   'უარი სტაციონარზე',
   'უარი კატეზე',
   'უარი ოპერაციაზე',
