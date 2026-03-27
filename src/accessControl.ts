@@ -31,7 +31,7 @@ export const ALLOWED_USERS: Record<string, AllowedUserConfig> = {
   },
   'nino.nikaberidze@gmail.com': {
     role: 'user',
-    label: 'იუზერი',
+    label: 'მენეჯერი',
     displayName: 'ნინო ნიქაბერიძე',
     canCreateRequests: true,
     canAccessRequestsModule: true,

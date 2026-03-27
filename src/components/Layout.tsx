@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { getRoleLabel } from '../accessControl';
+import { getAllowedUserConfig, getRoleLabel } from '../accessControl';
 import { useAuth } from '../AuthContext';
 import { auth, db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -64,6 +64,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1';
   });
+  const profileRoleLabel = getAllowedUserConfig(profile?.email)?.label || getRoleLabel(profile?.role);
 
   useArchiveMaintenance(Boolean(profile));
   useSheetPatientBackfill(Boolean(profile && canCreateRequests && !isRegistrar));
@@ -206,11 +207,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-slate-700">{profile?.fullName}</div>
                   <div className="truncate text-[11px] font-bold text-slate-500 sm:hidden">
-                    {getRoleLabel(profile?.role)}
+                    {profileRoleLabel}
                   </div>
                 </div>
                 <span className="hidden text-xs font-bold text-slate-500 sm:inline">
-                  ({getRoleLabel(profile?.role)})
+                  ({profileRoleLabel})
                 </span>
               </div>
               <button
