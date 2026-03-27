@@ -71,7 +71,7 @@ export const ALLOWED_USERS: Record<string, AllowedUserConfig> = {
   'giorgit@registrationhtmc.local': {
     role: 'shift_manager',
     label: 'ცვლის უფროსი',
-    displayName: 'giorgit',
+    displayName: 'გიორგი ტერტერაშვილი',
     loginAliases: ['giorgit'],
     canCreateRequests: true,
     canAccessRequestsModule: true,
@@ -85,7 +85,7 @@ export const ALLOWED_USERS: Record<string, AllowedUserConfig> = {
   'gulshanm@registrationhtmc.local': {
     role: 'shift_manager',
     label: 'ცვლის უფროსი',
-    displayName: 'gulshanm',
+    displayName: 'გულშან მამედოვა',
     loginAliases: ['gulshanm'],
     canCreateRequests: true,
     canAccessRequestsModule: true,
@@ -99,7 +99,7 @@ export const ALLOWED_USERS: Record<string, AllowedUserConfig> = {
   'ninoch@registrationhtmc.local': {
     role: 'shift_manager',
     label: 'ცვლის უფროსი',
-    displayName: 'ninoch',
+    displayName: 'ნინო ჭიღლაძე',
     loginAliases: ['ninoch'],
     canCreateRequests: true,
     canAccessRequestsModule: true,
@@ -185,11 +185,11 @@ export function resolveUserDisplayName(name?: string | null, email?: string | nu
     case 'nino.nikaberidze':
       return 'ნინო ნიქაბერიძე';
     case 'giorgit':
-      return 'giorgit';
+      return 'გიორგი ტერტერაშვილი';
     case 'gulshanm':
-      return 'gulshanm';
+      return 'გულშან მამედოვა';
     case 'ninoch':
-      return 'ninoch';
+      return 'ნინო ჭიღლაძე';
     case 'emergencyhtmc14':
       return 'რეგისტრატურა';
     default:
