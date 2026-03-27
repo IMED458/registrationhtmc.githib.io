@@ -141,16 +141,7 @@ function getPatientNameTextClass(request: ClinicalRequest) {
 
 function sortRequestsByCreatedAt(requests: ClinicalRequest[]) {
   return [...requests].sort(
-    (left, right) => {
-      const priorityDiff =
-        Number(needsRegistrarRework(right)) - Number(needsRegistrarRework(left));
-
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
-
-      return getRequestTimestampValue(right) - getRequestTimestampValue(left);
-    },
+    (left, right) => getRequestTimestampValue(right) - getRequestTimestampValue(left),
   );
 }
 
