@@ -10,8 +10,8 @@ import { findIcdEntryByCode, IcdEntry, preloadIcdEntries, searchIcdEntries } fro
 import { getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
 import { resolveRequestStatus } from '../requestStatusUtils';
 import { lookupPatientFromSheet } from '../sheetLookup';
-import { resolveServerApiUrl } from '../serverApi';
 import { getStudyTypes, sanitizeStudyTypes } from '../studyTypeUtils';
+import { syncRequestToSheet } from '../syncRequestToSheet';
 import { ClinicalRequest, DiagnosisEntry } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS, STUDY_TYPE_OPTIONS } from '../constants';
 import { ArrowLeft, FileText, Loader2, Plus, Save, Search, Trash2, User } from 'lucide-react';
@@ -711,32 +711,15 @@ export default function NewRequestPage() {
         });
       }
 
-      const sheetSyncUrl = resolveServerApiUrl('/api/external/sync-request');
-
-      if (sheetSyncUrl) {
-        try {
-          const syncResponse = await fetch(sheetSyncUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              historyNumber: formData.historyNumber,
-              personalId: formData.personalId,
-              icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
-              requestedAction: formData.requestedAction,
-              department: formData.department,
-              consentStatus: formData.consentStatus,
-              settings,
-            }),
-          });
-
-          if (!syncResponse.ok) {
-            const syncError = await syncResponse.json().catch(() => null);
-            console.error('Sheet sync error:', syncError);
-          }
-        } catch (sheetSyncError) {
-          console.error('Sheet sync request failed:', sheetSyncError);
-        }
-      }
+      await syncRequestToSheet({
+        historyNumber: formData.historyNumber,
+        personalId: formData.personalId,
+        icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+        requestedAction: formData.requestedAction,
+        department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
+        consentStatus: formData.consentStatus,
+        settings,
+      });
 
       navigateToDashboard();
     } catch (err) {

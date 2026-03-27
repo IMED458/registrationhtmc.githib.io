@@ -9,6 +9,7 @@ import { writeAuditLogEntry } from '../auditLog';
 import { getFirebaseActionErrorMessage } from '../firebaseActionErrors';
 import { getDiagnosisEntries, getRepresentativeDiagnosisEntry, normalizeIcdCode } from '../icd10Utils';
 import { getStudyTypes } from '../studyTypeUtils';
+import { syncRequestToSheet } from '../syncRequestToSheet';
 import { ClinicalRequest, DiagnosisEntry, PendingDoctorEdit, PendingRegistrarUpdate } from '../types';
 import { FINAL_DECISIONS, REQUEST_STATUSES } from '../constants';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Loader2, Pencil, Plus, Printer, Save, Trash2, User, X } from 'lucide-react';
@@ -739,6 +740,15 @@ export default function RequestDetailsPage() {
           newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${representativeDiagnosis?.code || representativeDiagnosis?.combined || '-'} / კომენტარი: ${formData.doctorEditComment.trim()}`,
         });
 
+        await syncRequestToSheet({
+          historyNumber: formData.historyNumber,
+          personalId: formData.personalId,
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          requestedAction: formData.requestedAction,
+          department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
+          consentStatus: formData.consentStatus,
+        });
+
         setConfirmAction(null);
         setIsEditing(false);
         navigateToDashboard();
@@ -795,6 +805,15 @@ export default function RequestDetailsPage() {
           actionType: 'ADMIN_FULL_EDIT',
           oldValue: `${request.patientData.firstName} ${request.patientData.lastName} / ${getUpdateSummary(request.currentStatus, request.finalDecision)}`,
           newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getUpdateSummary(resolvedCurrentStatus, formData.finalDecision)}`,
+        });
+
+        await syncRequestToSheet({
+          historyNumber: formData.historyNumber,
+          personalId: formData.personalId,
+          icdCode: representativeDiagnosis?.code || representativeDiagnosis?.icdCode || '',
+          requestedAction: formData.requestedAction,
+          department: formData.requestedAction === 'სტაციონარი' ? formData.department : '',
+          consentStatus: formData.consentStatus,
         });
 
         setConfirmAction(null);
