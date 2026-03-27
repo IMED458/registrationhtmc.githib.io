@@ -6,9 +6,12 @@ export const LEGACY_DEFAULT_GOOGLE_SHEET_URL =
 export const DEFAULT_GOOGLE_SHEET_URL =
   'https://docs.google.com/spreadsheets/d/1zsuLPC1hDVJ1pzGMsk_LY1bILCF6Dbd7/edit?gid=226530235#gid=226530235';
 
+export const DEFAULT_GOOGLE_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbyij6Xs4vi97zRAYQ-80TKEoJWKWZsNiedUn6GsiKBxZFUU2HnRwovBNfkwRRFCVwH0/exec';
+
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   googleSheetsId: DEFAULT_GOOGLE_SHEET_URL,
-  googleAppsScriptUrl: '',
+  googleAppsScriptUrl: DEFAULT_GOOGLE_APPS_SCRIPT_URL,
   googleDriveFolderId: '',
   sheetName: '',
   sheetGid: '',
