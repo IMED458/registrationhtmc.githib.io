@@ -254,6 +254,7 @@ export default function RequestDetailsPage() {
   const [formError, setFormError] = useState('');
   const [historyLogs, setHistoryLogs] = useState<AuditLog[]>([]);
   const autoStatusSyncRef = useRef(false);
+  const autoStatusHandledRef = useRef(false);
   const autoEditTriggeredRef = useRef(false);
   const [isManagementDirty, setIsManagementDirty] = useState(false);
 
@@ -281,23 +282,21 @@ export default function RequestDetailsPage() {
   const navigateToDashboard = () => navigate('/', { replace: true });
 
   useEffect(() => {
+    autoStatusSyncRef.current = false;
+    autoStatusHandledRef.current = false;
+    setIsManagementDirty(false);
+  }, [id]);
+
+  useEffect(() => {
     if (!id || !profile || !request || !isRegistrarOnly) {
       return;
     }
 
-    const hasRegistrarTouchedRequest = Boolean(
-      request.lastRegistrarEditAt ||
-      (request.registrarComment && request.registrarComment.trim()) ||
-      request.finalDecision,
-    );
-
-    if (hasRegistrarTouchedRequest) {
-      autoStatusSyncRef.current = false;
+    if (autoStatusHandledRef.current) {
       return;
     }
 
     if (resolveRequestStatusFromRequest(request) !== 'ახალი') {
-      autoStatusSyncRef.current = false;
       return;
     }
 
@@ -306,6 +305,7 @@ export default function RequestDetailsPage() {
     }
 
     autoStatusSyncRef.current = true;
+    autoStatusHandledRef.current = true;
 
     const markAsInReview = async () => {
       try {
@@ -325,6 +325,7 @@ export default function RequestDetailsPage() {
       } catch (error) {
         console.error('Auto in-review sync failed:', error);
         autoStatusSyncRef.current = false;
+        autoStatusHandledRef.current = false;
       }
     };
 
