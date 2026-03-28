@@ -58,10 +58,14 @@ export function resolveRequestStatusFromFinalDecision(
 export function resolveRequestStatusFromRequest(
   request: Pick<ClinicalRequest, 'currentStatus' | 'requestedAction' | 'department' | 'finalDecision'>,
 ) {
-  const normalizedCurrentStatus = normalizeRequestStatus(request.currentStatus || '') || 'ახალი';
+  const normalizedCurrentStatus = normalizeRequestStatus(request.currentStatus || '');
+
+  if (normalizedCurrentStatus) {
+    return normalizedCurrentStatus as RequestStatus;
+  }
 
   return resolveRequestStatus(
-    normalizedCurrentStatus as RequestStatus,
+    'ახალი',
     request.requestedAction,
     request.department,
     request.finalDecision,

@@ -284,6 +284,11 @@ export default function RequestDetailsPage() {
       return;
     }
 
+    if (request.lastRegistrarEditAt) {
+      autoStatusSyncRef.current = false;
+      return;
+    }
+
     if (resolveRequestStatusFromRequest(request) !== 'ახალი') {
       autoStatusSyncRef.current = false;
       return;
@@ -686,12 +691,14 @@ export default function RequestDetailsPage() {
         return;
       }
 
-      const resolvedCurrentStatus = resolveRequestStatus(
-        formData.currentStatus as ClinicalRequest['currentStatus'],
-        formData.requestedAction,
-        formData.department,
-        formData.finalDecision,
-      );
+      const resolvedCurrentStatus =
+        (normalizeRequestStatus(formData.currentStatus) as ClinicalRequest['currentStatus']) ||
+        resolveRequestStatus(
+          formData.currentStatus as ClinicalRequest['currentStatus'],
+          formData.requestedAction,
+          formData.department,
+          formData.finalDecision,
+        );
 
       const baseUpdate = {
         currentStatus: resolvedCurrentStatus,
