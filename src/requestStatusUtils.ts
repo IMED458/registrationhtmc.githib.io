@@ -36,9 +36,14 @@ export function resolveRequestStatus(
     return 'დასრულებულია' as RequestStatus;
   }
 
+  const mappedStatus = FINAL_DECISION_STATUS_MAP[normalizedFinalDecision];
+
+  if (mappedStatus) {
+    return mappedStatus;
+  }
+
   return (
     (normalizedCurrentStatus as RequestStatus) ||
-    FINAL_DECISION_STATUS_MAP[normalizedFinalDecision] ||
     'ახალი'
   );
 }
