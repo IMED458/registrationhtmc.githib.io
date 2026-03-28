@@ -11,54 +11,94 @@ service cloud.firestore {
         : "";
     }
 
-    function isAdmin() {
+    function staticRole() {
+      return userEmail() == "imedashviligio27@gmail.com" ? "admin" :
+        userEmail() == "nino.nikaberidze@gmail.com" ? "manager" :
+        userEmail() == "eringorokva@gmail.com" ? "doctor" :
+        userEmail() == "emergencyhtmc14@gmail.com" ? "registrar" :
+        userEmail() == "giorgit@registrationhtmc.local" ? "shift_manager" :
+        userEmail() == "gulshanm@registrationhtmc.local" ? "shift_manager" :
+        userEmail() == "ninoch@registrationhtmc.local" ? "shift_manager" :
+        "";
+    }
+
+    function ownUserDocExists() {
       return isSignedIn() &&
-        userEmail() == "imedashviligio27@gmail.com";
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function isDoctor() {
-      return isSignedIn() &&
-        userEmail() == "eringorokva@gmail.com";
+    function ownUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isRegistrar() {
-      return isSignedIn() && (
-        userEmail() == "emergencyhtmc14@gmail.com"
-      );
+    function dynamicRole() {
+      return ownUserDocExists() && ownUserDoc().isActive != false && ownUserDoc().role != null
+        ? ownUserDoc().role
+        : "";
     }
 
-    function isUser() {
-      return isSignedIn() &&
-        userEmail() == "nino.nikaberidze@gmail.com";
+    function currentRole() {
+      return dynamicRole() != "" ? dynamicRole() : staticRole();
     }
 
-    function isShiftManager() {
-      return isSignedIn() && (
-        userEmail() == "giorgit@registrationhtmc.local" ||
-        userEmail() == "gulshanm@registrationhtmc.local" ||
-        userEmail() == "ninoch@registrationhtmc.local"
-      );
+    function hasGlobalSettings() {
+      return exists(/databases/$(database)/documents/settings/global);
+    }
+
+    function globalSettings() {
+      return hasGlobalSettings()
+        ? get(/databases/$(database)/documents/settings/global).data
+        : {};
+    }
+
+    function disabledEmails() {
+      return hasGlobalSettings() && ('disabledEmails' in globalSettings())
+        ? globalSettings().disabledEmails
+        : [];
+    }
+
+    function isDisabled() {
+      return isSignedIn() && userEmail() in disabledEmails();
     }
 
     function isAllowedUser() {
-      return isAdmin() || isDoctor() || isRegistrar() || isUser() || isShiftManager();
+      return isSignedIn() && !isDisabled() && (staticRole() != "" || dynamicRole() != "");
+    }
+
+    function isAdmin() {
+      return isAllowedUser() && currentRole() == "admin";
+    }
+
+    function isDoctorOrNurse() {
+      return isAllowedUser() && (
+        currentRole() == "doctor" ||
+        currentRole() == "nurse"
+      );
+    }
+
+    function isRegistrar() {
+      return isAllowedUser() && currentRole() == "registrar";
+    }
+
+    function isManagerLike() {
+      return isAllowedUser() && (
+        currentRole() == "manager" ||
+        currentRole() == "user" ||
+        currentRole() == "shift_manager"
+      );
     }
 
     function canCreateRequests() {
-      return isAdmin() || isDoctor() || isUser() || isShiftManager();
+      return isAdmin() || isDoctorOrNurse() || isManagerLike();
     }
 
     function canUpdateRequests() {
-      return isAdmin() || isDoctor() || isRegistrar() || isUser() || isShiftManager();
-    }
-
-    function canCreateAuditLogs() {
-      return isAdmin() || isDoctor() || isRegistrar() || isUser() || isShiftManager();
+      return isAdmin() || isDoctorOrNurse() || isRegistrar() || isManagerLike();
     }
 
     match /users/{userId} {
-      allow read: if isAllowedUser();
-      allow create, update: if isAllowedUser() && request.auth.uid == userId;
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
 
@@ -71,7 +111,7 @@ service cloud.firestore {
 
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if canCreateAuditLogs();
+      allow create: if isAllowedUser();
       allow update, delete: if isAdmin();
     }
 

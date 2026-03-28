@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
 } from 'firebase/auth';
-import { ACCESS_DENIED_MESSAGE, getAllowedUserConfig, normalizeEmail } from '../accessControl';
+import { normalizeEmail, resolveLoginEmail } from '../accessControl';
 import { useAuth } from '../AuthContext';
 import { auth } from '../firebase';
 import { AlertCircle, Chrome, ClipboardList, Mail } from 'lucide-react';
@@ -72,10 +72,10 @@ export default function LoginPage() {
     }
 
     const normalizedIdentifier = normalizeEmail(identifier);
-    const allowedUser = getAllowedUserConfig(normalizedIdentifier);
+    const loginEmail = resolveLoginEmail(normalizedIdentifier);
 
-    if (!allowedUser) {
-      setError(ACCESS_DENIED_MESSAGE);
+    if (!loginEmail) {
+      setError('მიუთითეთ მომხმარებელი ან ელ-ფოსტა.');
       return;
     }
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await signInWithEmailAndPassword(auth, allowedUser.email, password);
+      await signInWithEmailAndPassword(auth, loginEmail, password);
     } catch (err: any) {
       if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
         setError('მომხმარებელი/ელ-ფოსტა ან პაროლი არასწორია.');

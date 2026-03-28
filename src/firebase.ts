@@ -17,7 +17,7 @@ export const missingFirebaseEnvKeys = requiredFirebaseEnvKeys.filter(
 export const isFirebaseConfigured = missingFirebaseEnvKeys.length === 0;
 export const firebaseVapidPublicKey = import.meta.env.VITE_FIREBASE_VAPID_PUBLIC_KEY?.trim() || '';
 
-const firebaseConfig: FirebaseOptions | null = isFirebaseConfigured
+export const firebaseClientConfig: FirebaseOptions | null = isFirebaseConfigured
   ? {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -30,7 +30,9 @@ const firebaseConfig: FirebaseOptions | null = isFirebaseConfigured
   : null;
 
 const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
-export const app = firebaseConfig ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null;
+export const app = firebaseClientConfig
+  ? (getApps().length > 0 ? getApp() : initializeApp(firebaseClientConfig))
+  : null;
 
 export const auth: Auth | null = app ? getAuth(app) : null;
 export const db: Firestore | null = app

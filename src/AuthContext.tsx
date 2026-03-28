@@ -65,12 +65,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const allowedUser = getAllowedUserConfig(firebaseUser.email);
+        let existingProfile: Partial<UserProfile> | null = null;
 
-        if (!allowedUser) {
+        try {
+          const docRef = doc(db, 'users', firebaseUser.uid);
+          const docSnap = await getDoc(docRef);
+          existingProfile = docSnap.exists() ? (docSnap.data() as Partial<UserProfile>) : null;
+        } catch (profileReadError) {
+          console.warn('User profile read failed during auth check:', profileReadError);
+        }
+
+        const allowedUser = getAllowedUserConfig(firebaseUser.email, existingProfile);
+
+        if (!allowedUser || existingProfile?.isActive === false) {
           setUser(null);
           setProfile(null);
-          setAuthError(ACCESS_DENIED_MESSAGE);
+          setAuthError(
+            existingProfile?.isActive === false
+              ? 'ამ ანგარიშის წვდომა ადმინისტრატორმა გათიშა.'
+              : ACCESS_DENIED_MESSAGE,
+          );
           await signOut(auth);
           setLoading(false);
           return;
@@ -95,21 +109,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setAuthError('');
-
-        let existingProfile: Partial<UserProfile> | null = null;
         const fallbackProfile: UserProfile = {
           uid: firebaseUser.uid,
-          fullName: resolveUserDisplayName(firebaseUser.displayName || allowedUser.email, allowedUser.email) || 'Clinic User',
+          fullName:
+            resolveUserDisplayName(
+              firebaseUser.displayName || existingProfile?.fullName || allowedUser.displayName || allowedUser.email,
+              allowedUser.email,
+            ) || 'Clinic User',
           email: allowedUser.email,
           role: allowedUser.role,
           createdAt: new Date().toISOString(),
+          username: existingProfile?.username || allowedUser.username,
+          isActive: existingProfile?.isActive ?? true,
+          isManaged: existingProfile?.isManaged ?? false,
+          canApproveAdminChanges: existingProfile?.canApproveAdminChanges ?? allowedUser.canApproveAdminChanges,
+          notificationTokens: existingProfile?.notificationTokens ?? [],
         };
 
         try {
           const docRef = doc(db, 'users', firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-          existingProfile = docSnap.exists() ? (docSnap.data() as Partial<UserProfile>) : null;
-
           const mergedProfile: UserProfile = {
             ...fallbackProfile,
             fullName: resolveUserDisplayName(
@@ -119,6 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               allowedUser.email,
             ) || fallbackProfile.fullName,
             createdAt: existingProfile?.createdAt || fallbackProfile.createdAt,
+            username: existingProfile?.username || fallbackProfile.username,
+            isActive: existingProfile?.isActive ?? fallbackProfile.isActive,
+            isManaged: existingProfile?.isManaged ?? fallbackProfile.isManaged,
+            canApproveAdminChanges:
+              existingProfile?.canApproveAdminChanges ?? fallbackProfile.canApproveAdminChanges,
+            notificationTokens: existingProfile?.notificationTokens ?? fallbackProfile.notificationTokens,
           };
 
           await setDoc(docRef, mergedProfile, { merge: true });
@@ -185,14 +209,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     loading,
     isAdmin: profile?.role === 'admin',
-    canFullRequestEdit: Boolean(getAllowedUserConfig(profile?.email)?.canFullRequestEdit),
-    canEditAllRequests: Boolean(getAllowedUserConfig(profile?.email)?.canEditAllRequests),
-    canEditAdminContent: Boolean(getAllowedUserConfig(profile?.email)?.canEditAdminContent),
-    canCreateRequests: Boolean(getAllowedUserConfig(profile?.email)?.canCreateRequests),
-    canAccessRequestsModule: Boolean(getAllowedUserConfig(profile?.email)?.canAccessRequestsModule),
-    canAccessAdminPanel: Boolean(getAllowedUserConfig(profile?.email)?.canAccessAdminPanel),
-    canApproveAdminChanges: Boolean(getAllowedUserConfig(profile?.email)?.canApproveAdminChanges),
-    canReceiveRequestNotifications: Boolean(getAllowedUserConfig(profile?.email)?.canReceiveRequestNotifications),
+    canFullRequestEdit: Boolean(getAllowedUserConfig(profile?.email, profile)?.canFullRequestEdit),
+    canEditAllRequests: Boolean(getAllowedUserConfig(profile?.email, profile)?.canEditAllRequests),
+    canEditAdminContent: Boolean(getAllowedUserConfig(profile?.email, profile)?.canEditAdminContent),
+    canCreateRequests: Boolean(getAllowedUserConfig(profile?.email, profile)?.canCreateRequests),
+    canAccessRequestsModule: Boolean(getAllowedUserConfig(profile?.email, profile)?.canAccessRequestsModule),
+    canAccessAdminPanel: Boolean(getAllowedUserConfig(profile?.email, profile)?.canAccessAdminPanel),
+    canApproveAdminChanges: Boolean(getAllowedUserConfig(profile?.email, profile)?.canApproveAdminChanges),
+    canReceiveRequestNotifications: Boolean(getAllowedUserConfig(profile?.email, profile)?.canReceiveRequestNotifications),
     isDoctorOrNurse: profile?.role === 'doctor' || profile?.role === 'nurse',
     isRegistrar: profile?.role === 'registrar',
   };

@@ -1,4 +1,4 @@
-export type UserRole = 'doctor' | 'nurse' | 'registrar' | 'admin' | 'user' | 'shift_manager';
+export type UserRole = 'doctor' | 'nurse' | 'registrar' | 'admin' | 'manager' | 'shift_manager' | 'user';
 
 export interface UserProfile {
   uid: string;
@@ -7,6 +7,10 @@ export interface UserProfile {
   role: UserRole;
   createdAt: string;
   notificationTokens?: string[];
+  username?: string;
+  isActive?: boolean;
+  isManaged?: boolean;
+  canApproveAdminChanges?: boolean;
 }
 
 export interface Patient {
