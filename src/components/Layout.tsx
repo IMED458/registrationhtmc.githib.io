@@ -56,7 +56,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   } = useAuth();
   const navigate = useNavigate();
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
-  const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260324e`;
+  const appLogoUrl = `${import.meta.env.BASE_URL}clinic-transfer-logo.png?v=20260329a`;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
