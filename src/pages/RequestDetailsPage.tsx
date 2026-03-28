@@ -255,6 +255,7 @@ export default function RequestDetailsPage() {
   const [historyLogs, setHistoryLogs] = useState<AuditLog[]>([]);
   const autoStatusSyncRef = useRef(false);
   const autoEditTriggeredRef = useRef(false);
+  const [isManagementDirty, setIsManagementDirty] = useState(false);
 
   const [formData, setFormData] = useState<RequestEditFormState>(() => buildFormDataFromRequest(null));
 
@@ -281,11 +282,6 @@ export default function RequestDetailsPage() {
 
   useEffect(() => {
     if (!id || !profile || !request || !isRegistrarOnly) {
-      return;
-    }
-
-    if (request.lastRegistrarEditAt) {
-      autoStatusSyncRef.current = false;
       return;
     }
 
@@ -359,7 +355,7 @@ export default function RequestDetailsPage() {
         return nextRequest;
       });
 
-      if (!updating && !confirmAction && !isEditing) {
+      if (!updating && !confirmAction && !isEditing && !isManagementDirty) {
         setFormData(buildFormDataFromRequest(data, profile?.fullName));
       }
 
@@ -427,7 +423,7 @@ export default function RequestDetailsPage() {
       window.removeEventListener('focus', refreshVisibleRequest);
       document.removeEventListener('visibilitychange', refreshVisibleRequest);
     };
-  }, [confirmAction, id, isEditing, profile?.fullName, updating]);
+  }, [confirmAction, id, isEditing, isManagementDirty, profile?.fullName, updating]);
 
   useEffect(() => {
     if (!id) {
@@ -618,6 +614,7 @@ export default function RequestDetailsPage() {
     setFormError('');
     setSyncNoticeMessage('');
     setFormData(buildFormDataFromRequest(request, profile?.fullName));
+    setIsManagementDirty(false);
     setIsEditing(true);
   };
 
@@ -625,6 +622,7 @@ export default function RequestDetailsPage() {
     setFormError('');
     setConfirmAction(null);
     setFormData(buildFormDataFromRequest(request, profile?.fullName));
+    setIsManagementDirty(false);
     setIsEditing(false);
   };
 
@@ -647,6 +645,7 @@ export default function RequestDetailsPage() {
         nextFinalDecision,
       ),
     }));
+    setIsManagementDirty(true);
   };
 
   const submitUpdate = async (actionOverride?: ConfirmAction) => {
@@ -763,6 +762,7 @@ export default function RequestDetailsPage() {
         });
 
         setConfirmAction(null);
+        setIsManagementDirty(false);
         setIsEditing(false);
         navigateToDashboard();
         return;
@@ -987,6 +987,7 @@ export default function RequestDetailsPage() {
       });
 
       setConfirmAction(null);
+      setIsManagementDirty(false);
       setIsEditing(false);
       navigateToDashboard();
     } catch (err) {
@@ -1644,7 +1645,10 @@ export default function RequestDetailsPage() {
                             <select
                               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                               value={formData.currentStatus}
-                              onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
+                              onChange={(e) => {
+                                setFormData({ ...formData, currentStatus: e.target.value });
+                                setIsManagementDirty(true);
+                              }}
                             >
                               {statusOptions.map((status) => (
                                 <option key={status} value={status}>{status}</option>
@@ -1670,7 +1674,10 @@ export default function RequestDetailsPage() {
                               type="text"
                               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
                               value={formData.registrarName}
-                              onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
+                              onChange={(e) => {
+                                setFormData({ ...formData, registrarName: e.target.value });
+                                setIsManagementDirty(true);
+                              }}
                             />
                           </div>
                           <div className="space-y-2">
@@ -1679,7 +1686,10 @@ export default function RequestDetailsPage() {
                               type="text"
                               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
                               value={formData.formFillerName}
-                              onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
+                              onChange={(e) => {
+                                setFormData({ ...formData, formFillerName: e.target.value });
+                                setIsManagementDirty(true);
+                              }}
                             />
                           </div>
                           <div className="space-y-2 sm:col-span-2">
@@ -1688,7 +1698,10 @@ export default function RequestDetailsPage() {
                               rows={3}
                               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 outline-none resize-none focus:ring-2 focus:ring-emerald-500"
                               value={formData.registrarComment}
-                              onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
+                              onChange={(e) => {
+                                setFormData({ ...formData, registrarComment: e.target.value });
+                                setIsManagementDirty(true);
+                              }}
                             />
                           </div>
                         </div>
@@ -1783,7 +1796,10 @@ export default function RequestDetailsPage() {
                       <select
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                         value={formData.currentStatus}
-                        onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, currentStatus: e.target.value });
+                          setIsManagementDirty(true);
+                        }}
                       >
                         {statusOptions.map((status) => (
                           <option key={status} value={status}>{status}</option>
@@ -1812,7 +1828,10 @@ export default function RequestDetailsPage() {
                           type="text"
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                           value={formData.registrarName}
-                          onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, registrarName: e.target.value });
+                            setIsManagementDirty(true);
+                          }}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1821,7 +1840,10 @@ export default function RequestDetailsPage() {
                           type="text"
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                           value={formData.formFillerName}
-                          onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, formFillerName: e.target.value });
+                            setIsManagementDirty(true);
+                          }}
                         />
                       </div>
                     </div>
@@ -1835,7 +1857,10 @@ export default function RequestDetailsPage() {
                         rows={3}
                         className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                         value={formData.registrarComment}
-                        onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, registrarComment: e.target.value });
+                          setIsManagementDirty(true);
+                        }}
                       />
                     </div>
                   </>
@@ -1903,7 +1928,10 @@ export default function RequestDetailsPage() {
                   <select
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                     value={formData.currentStatus}
-                    onChange={(e) => setFormData({ ...formData, currentStatus: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, currentStatus: e.target.value });
+                      setIsManagementDirty(true);
+                    }}
                   >
                     {statusOptions.map((status) => (
                       <option key={status} value={status}>{status}</option>
@@ -1932,7 +1960,10 @@ export default function RequestDetailsPage() {
                       type="text"
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                       value={formData.registrarName}
-                      onChange={(e) => setFormData({ ...formData, registrarName: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, registrarName: e.target.value });
+                        setIsManagementDirty(true);
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1941,7 +1972,10 @@ export default function RequestDetailsPage() {
                       type="text"
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                       value={formData.formFillerName}
-                      onChange={(e) => setFormData({ ...formData, formFillerName: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, formFillerName: e.target.value });
+                        setIsManagementDirty(true);
+                      }}
                     />
                   </div>
                 </div>
@@ -1955,7 +1989,10 @@ export default function RequestDetailsPage() {
                     rows={3}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                     value={formData.registrarComment}
-                    onChange={(e) => setFormData({ ...formData, registrarComment: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, registrarComment: e.target.value });
+                      setIsManagementDirty(true);
+                    }}
                   />
                 </div>
 
