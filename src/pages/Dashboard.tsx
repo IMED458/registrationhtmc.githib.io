@@ -548,9 +548,9 @@ export default function Dashboard() {
                   <div className="mt-1 text-sm text-slate-700">{getCreatedAtLabel(req)}</div>
                 </div>
                 {req.finalDecision && (
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">საბოლოო გადაწყვეტილება</div>
-                    <div className={`mt-1 text-sm font-bold leading-5 ${getFinalDecisionTextClass(req.finalDecision)}`}>
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 shadow-sm shadow-amber-100">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-amber-700">საბოლოო გადაწყვეტილება</div>
+                    <div className={`mt-1 text-sm font-black leading-5 ${getFinalDecisionTextClass(req.finalDecision)}`}>
                       {req.finalDecision}
                     </div>
                   </div>
