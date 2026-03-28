@@ -575,9 +575,18 @@ export default function NewRequestPage() {
     }
 
     const diagnoses = sanitizeDiagnoses(formData.diagnoses);
-    const studyTypes = sanitizeStudyTypes([...formData.studyTypes, studyTypeInput]);
+    const studyTypes = sanitizeStudyTypes(formData.studyTypes);
     const normalizedPatientName = formData.patientName.trim();
     const splitPatientData = splitPatientName(normalizedPatientName);
+    const hasPendingStudySelection = formData.requestedAction === 'კვლევა' && (
+      selectedStudyOption.trim().length > 0 ||
+      studyTypeInput.trim().length > 0
+    );
+
+    if (requiresStructuredFields && hasPendingStudySelection) {
+      setError('დაამატეთ კვლევა.');
+      return;
+    }
 
     if (requiresStructuredFields && formData.requestedAction === 'კვლევა' && studyTypes.length === 0) {
       setError('კვლევის მოთხოვნისთვის მიუთითეთ მინიმუმ ერთი კვლევის ტიპი.');

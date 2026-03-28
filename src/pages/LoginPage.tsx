@@ -107,6 +107,11 @@ export default function LoginPage() {
     }
   };
 
+  const handleEmailAuthSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await handleEmailAuth();
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md space-y-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-xl sm:p-8 sm:space-y-8">
@@ -137,7 +142,7 @@ export default function LoginPage() {
             {loading || authLoading ? 'მიმდინარეობს...' : 'შესვლა'}
           </button>
 
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <form onSubmit={handleEmailAuthSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-700">მომხმარებელი ან ელ-ფოსტა</label>
               <div className="relative">
@@ -164,14 +169,13 @@ export default function LoginPage() {
             </div>
 
             <button
-              type="button"
-              onClick={handleEmailAuth}
+              type="submit"
               disabled={loading || authLoading}
               className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading || authLoading ? 'მიმდინარეობს...' : 'შესვლა'}
             </button>
-          </div>
+          </form>
         </div>
         
         <div className="text-center text-xs text-slate-400">
