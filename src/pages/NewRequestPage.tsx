@@ -61,6 +61,35 @@ function sanitizeDiagnoses(rows: DiagnosisFormRow[]): DiagnosisEntry[] {
   return sanitizedRows;
 }
 
+function composePatientName(firstName?: string | null, lastName?: string | null) {
+  return [String(lastName || '').trim(), String(firstName || '').trim()].filter(Boolean).join(' ').trim();
+}
+
+function splitPatientName(patientName: string) {
+  const normalizedName = String(patientName || '').replace(/\s+/g, ' ').trim();
+
+  if (!normalizedName) {
+    return {
+      firstName: '',
+      lastName: '',
+    };
+  }
+
+  const nameParts = normalizedName.split(' ');
+
+  if (nameParts.length === 1) {
+    return {
+      firstName: '',
+      lastName: nameParts[0],
+    };
+  }
+
+  return {
+    firstName: nameParts.slice(1).join(' '),
+    lastName: nameParts[0],
+  };
+}
+
 function buildFormDataFromRequest(request: ClinicalRequest) {
   const diagnoses = (request.diagnoses?.length
     ? request.diagnoses
@@ -78,8 +107,7 @@ function buildFormDataFromRequest(request: ClinicalRequest) {
     }));
 
   return {
-    firstName: request.patientData.firstName || '',
-    lastName: request.patientData.lastName || '',
+    patientName: composePatientName(request.patientData.firstName, request.patientData.lastName),
     historyNumber: request.patientData.historyNumber || '',
     personalId: request.patientData.personalId || '',
     birthDate: request.patientData.birthDate || '',
@@ -122,8 +150,7 @@ export default function NewRequestPage() {
   const [selectedStudyOption, setSelectedStudyOption] = useState('');
   
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    patientName: '',
     historyNumber: '',
     personalId: '',
     birthDate: '',
@@ -454,7 +481,13 @@ export default function NewRequestPage() {
       if (directPatient) {
         setFormData((prev) => ({
           ...prev,
-          ...directPatient,
+          patientName: composePatientName(directPatient.firstName, directPatient.lastName),
+          historyNumber: directPatient.historyNumber,
+          personalId: directPatient.personalId,
+          birthDate: directPatient.birthDate,
+          insurance: directPatient.insurance,
+          phone: directPatient.phone,
+          address: directPatient.address,
         }));
         setPatientLookupSource('sheet');
         setLookupMessage('პაციენტის ინფორმაცია წარმატებით ჩაიტვირთა.');
@@ -483,7 +516,13 @@ export default function NewRequestPage() {
         const patient = await response.json();
         setFormData((prev) => ({
           ...prev,
-          ...patient
+          patientName: composePatientName(patient.firstName, patient.lastName),
+          historyNumber: patient.historyNumber,
+          personalId: patient.personalId,
+          birthDate: patient.birthDate,
+          insurance: patient.insurance,
+          phone: patient.phone,
+          address: patient.address,
         }));
         setPatientLookupSource('sheet');
         setLookupMessage('პაციენტის ინფორმაცია წარმატებით ჩაიტვირთა.');
@@ -537,6 +576,8 @@ export default function NewRequestPage() {
 
     const diagnoses = sanitizeDiagnoses(formData.diagnoses);
     const studyTypes = sanitizeStudyTypes([...formData.studyTypes, studyTypeInput]);
+    const normalizedPatientName = formData.patientName.trim();
+    const splitPatientData = splitPatientName(normalizedPatientName);
 
     if (requiresStructuredFields && formData.requestedAction === 'კვლევა' && studyTypes.length === 0) {
       setError('კვლევის მოთხოვნისთვის მიუთითეთ მინიმუმ ერთი კვლევის ტიპი.');
@@ -579,8 +620,8 @@ export default function NewRequestPage() {
       );
 
       const nextPatientData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: splitPatientData.firstName,
+        lastName: splitPatientData.lastName,
         historyNumber: formData.historyNumber,
         personalId: formData.personalId,
         birthDate: formData.birthDate,
@@ -644,7 +685,7 @@ export default function NewRequestPage() {
           requestId: editRequestId,
           actionType: 'FULL_EDIT',
           oldValue: `${existingRequest.patientData.firstName} ${existingRequest.patientData.lastName} / ${getRequestActionLabel(existingRequest.requestedAction, existingRequest.department)}`,
-          newValue: `${formData.firstName.trim()} ${formData.lastName.trim()} / ${getRequestActionLabel(formData.requestedAction, formData.department)} / ${editSummary}`,
+          newValue: `${normalizedPatientName} / ${getRequestActionLabel(formData.requestedAction, formData.department)} / ${editSummary}`,
         });
       } else {
         const requestData: Omit<ClinicalRequest, 'id'> = {
@@ -849,24 +890,14 @@ export default function NewRequestPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">სახელი</label>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-bold text-slate-700">სახელი და გვარი</label>
                 <input
                   type="text"
                   required={requiresStructuredFields}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">გვარი</label>
-                <input
-                  type="text"
-                  required={requiresStructuredFields}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  value={formData.patientName}
+                  onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                 />
               </div>
             </div>
