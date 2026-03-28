@@ -605,11 +605,11 @@ export default function Dashboard() {
       </div>
 
       {/* Table */}
-      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
+              <tr className="bg-slate-50 border-b border-slate-300">
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">პაციენტი</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">დიაგნოზი (ICD-10)</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ისტორია / პირადი №</th>
@@ -620,7 +620,7 @@ export default function Dashboard() {
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">მოქმედება</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
