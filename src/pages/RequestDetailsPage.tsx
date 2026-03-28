@@ -285,6 +285,17 @@ export default function RequestDetailsPage() {
       return;
     }
 
+    const hasRegistrarTouchedRequest = Boolean(
+      request.lastRegistrarEditAt ||
+      (request.registrarComment && request.registrarComment.trim()) ||
+      request.finalDecision,
+    );
+
+    if (hasRegistrarTouchedRequest) {
+      autoStatusSyncRef.current = false;
+      return;
+    }
+
     if (resolveRequestStatusFromRequest(request) !== 'ახალი') {
       autoStatusSyncRef.current = false;
       return;
