@@ -429,7 +429,10 @@ export default function NewRequestPage() {
   };
 
   const handleLookup = async () => {
-    if (!formData.historyNumber && !formData.personalId) return;
+    if (!formData.historyNumber.trim()) {
+      setLookupMessage('მიუთითეთ ისტორიის ნომერი.');
+      return;
+    }
     
     setSearching(true);
     setLookupMessage('');
@@ -462,7 +465,7 @@ export default function NewRequestPage() {
 
       if (!lookupApiUrl) {
         setPatientLookupSource('manual');
-        setLookupMessage('პაციენტი ვერ მოიძებნა. შეგიძლიათ ფორმა ხელით შეავსოთ, ველები სავალდებულო არ არის.');
+        setLookupMessage('პაციენტი ვერ მოიძებნა. შეგიძლიათ ფორმა ხელით შეავსოთ, მაგრამ ისტორიის ნომერი სავალდებულოა.');
         return;
       }
 
@@ -486,12 +489,12 @@ export default function NewRequestPage() {
         setLookupMessage('პაციენტის ინფორმაცია წარმატებით ჩაიტვირთა.');
       } else {
         setPatientLookupSource('manual');
-        setLookupMessage('პაციენტი ვერ მოიძებნა. შეგიძლიათ ფორმა ხელით შეავსოთ, ველები სავალდებულო არ არის.');
+        setLookupMessage('პაციენტი ვერ მოიძებნა. შეგიძლიათ ფორმა ხელით შეავსოთ, მაგრამ ისტორიის ნომერი სავალდებულოა.');
       }
     } catch (err) {
       console.error("Lookup error:", err);
       setPatientLookupSource('manual');
-      setLookupMessage('პაციენტის მოძებნა ვერ მოხერხდა. შეგიძლიათ ფორმა ხელით შეავსოთ, ველები სავალდებულო არ არის.');
+      setLookupMessage('პაციენტის მოძებნა ვერ მოხერხდა. შეგიძლიათ ფორმა ხელით შეავსოთ, მაგრამ ისტორიის ნომერი სავალდებულოა.');
     } finally {
       setSearching(false);
     }
@@ -519,6 +522,11 @@ export default function NewRequestPage() {
 
     if (isEditMode && !canEditCurrentRequest) {
       setError('ამ ანგარიშს ამ ჩანაწერის სრული რედაქტირების უფლება არ აქვს.');
+      return;
+    }
+
+    if (!formData.historyNumber.trim()) {
+      setError('ისტორიის ნომერი სავალდებულოა.');
       return;
     }
 
@@ -810,7 +818,7 @@ export default function NewRequestPage() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
-                    required={requiresStructuredFields}
+                    required
                     className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={formData.historyNumber}
                     onChange={(e) => setFormData({ ...formData, historyNumber: e.target.value })}
