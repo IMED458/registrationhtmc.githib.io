@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -828,28 +829,31 @@ export default function NewRequestPage() {
 
   return (
     <div className="w-full max-w-none space-y-6 pb-12">
-      {error && (
-        <div
-          className="fixed left-4 right-4 top-4 z-[90] sm:left-auto sm:right-4 sm:top-4 sm:w-[26rem]"
-          role="alert"
-        >
-          <div className="flex items-start gap-3 rounded-2xl border border-red-300 bg-white/95 px-4 py-3 text-red-700 shadow-2xl shadow-red-200/60 ring-1 ring-red-100 backdrop-blur-sm sm:rounded-3xl">
-            <div className="min-w-0 flex-1">
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
-                მოთხოვნა ვერ დაემატა
+      {error && typeof document !== 'undefined' && createPortal(
+        <div className="pointer-events-none fixed inset-0 z-[9999] flex items-start justify-end p-4 pt-20 sm:pt-24">
+          <div
+            className="pointer-events-auto w-full max-w-md rounded-2xl border border-red-300 bg-white px-4 py-3 text-red-700 shadow-2xl shadow-red-200/60 ring-1 ring-red-100"
+            role="alert"
+          >
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
+                  მოთხოვნა ვერ დაემატა
+                </div>
+                <div className="mt-1 text-sm font-medium leading-6">{error}</div>
               </div>
-              <div className="mt-1 text-sm font-medium leading-6">{error}</div>
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="rounded-full p-1 text-red-500 transition hover:bg-red-100 hover:text-red-700"
+                aria-label="შეცდომის დახურვა"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setError('')}
-              className="rounded-full p-1 text-red-500 transition hover:bg-red-100 hover:text-red-700"
-              aria-label="შეცდომის დახურვა"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <div className="flex items-center gap-3 sm:gap-4">
