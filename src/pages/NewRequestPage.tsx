@@ -830,8 +830,7 @@ export default function NewRequestPage() {
     <div className="w-full max-w-none space-y-6 pb-12">
       {error && (
         <div
-          className="fixed left-4 right-4 z-[90] sm:left-auto sm:w-full sm:max-w-md"
-          style={{ top: 'max(1rem, calc(env(safe-area-inset-top) + 0.5rem))' }}
+          className="fixed left-4 right-4 top-4 z-[90] sm:left-auto sm:right-4 sm:top-4 sm:w-[26rem]"
           role="alert"
         >
           <div className="flex items-start gap-3 rounded-2xl border border-red-300 bg-white/95 px-4 py-3 text-red-700 shadow-2xl shadow-red-200/60 ring-1 ring-red-100 backdrop-blur-sm sm:rounded-3xl">
