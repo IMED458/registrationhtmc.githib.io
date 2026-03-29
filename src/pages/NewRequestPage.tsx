@@ -167,7 +167,7 @@ export default function NewRequestPage() {
   });
 
   const requiresDiagnosisDescription =
-    requiresStructuredFields && formData.requestedAction !== 'კვლევა';
+    formData.requestedAction === 'ბინა' || formData.requestedAction === 'სტაციონარი';
   const resolvedSenderName = formData.senderName.trim() || automaticSenderName;
   const hasMultipleDiagnoses = formData.diagnoses.length > 1;
   const hasExplicitPrimaryDiagnosis = formData.diagnoses.some((row) => row.isPrimary);
