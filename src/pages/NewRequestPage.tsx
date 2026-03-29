@@ -830,7 +830,7 @@ export default function NewRequestPage() {
     <div className="w-full max-w-none space-y-6 pb-12">
       {error && (
         <div
-          className="fixed left-4 right-4 z-[70] sm:left-1/2 sm:right-auto sm:w-full sm:max-w-md sm:-translate-x-1/2"
+          className="fixed left-4 right-4 z-[70] sm:hidden"
           style={{ top: 'max(1rem, env(safe-area-inset-top))' }}
         >
           <div className="flex items-start gap-3 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-2xl shadow-red-200/50">
@@ -860,6 +860,12 @@ export default function NewRequestPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="hidden rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:block">
+            {error}
+          </div>
+        )}
+
         {lookupMessage && !error && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {lookupMessage}
