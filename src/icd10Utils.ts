@@ -43,7 +43,12 @@ function transliterateGeorgianIcdInput(value: string) {
 }
 
 export function normalizeIcdCode(value: string | undefined) {
-  return transliterateGeorgianIcdInput((value || '').trim().toLowerCase()).toUpperCase();
+  return transliterateGeorgianIcdInput(
+    (value || '')
+      .trim()
+      .replace(/,/g, '.')
+      .toLowerCase(),
+  ).toUpperCase();
 }
 
 export function extractClinicalIcdCode(value: string | undefined) {
