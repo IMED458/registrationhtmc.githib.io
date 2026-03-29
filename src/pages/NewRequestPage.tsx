@@ -830,11 +830,16 @@ export default function NewRequestPage() {
     <div className="w-full max-w-none space-y-6 pb-12">
       {error && (
         <div
-          className="fixed left-4 right-4 z-[70] sm:hidden"
+          className="fixed left-1/2 z-[80] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2"
           style={{ top: 'max(1rem, env(safe-area-inset-top))' }}
         >
-          <div className="flex items-start gap-3 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-2xl shadow-red-200/50">
-            <div className="min-w-0 flex-1 font-medium leading-6">{error}</div>
+          <div className="flex items-start gap-3 rounded-2xl border border-red-300 bg-white/95 px-4 py-3 text-red-700 shadow-2xl shadow-red-200/60 ring-1 ring-red-100 backdrop-blur-sm">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
+                მოთხოვნა ვერ დაემატა
+              </div>
+              <div className="mt-1 text-sm font-medium leading-6">{error}</div>
+            </div>
             <button
               type="button"
               onClick={() => setError('')}
@@ -860,12 +865,6 @@ export default function NewRequestPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="hidden rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:block">
-            {error}
-          </div>
-        )}
-
         {lookupMessage && !error && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {lookupMessage}
