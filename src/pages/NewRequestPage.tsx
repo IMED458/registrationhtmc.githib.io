@@ -15,7 +15,7 @@ import { getStudyTypes, sanitizeStudyTypes } from '../studyTypeUtils';
 import { syncRequestToSheet } from '../syncRequestToSheet';
 import { ClinicalRequest, DiagnosisEntry } from '../types';
 import { REQUEST_ACTIONS, CONSENT_STATUSES, DEPARTMENTS, STUDY_TYPE_OPTIONS } from '../constants';
-import { ArrowLeft, FileText, Loader2, Plus, Save, Search, Trash2, User } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Plus, Save, Search, Trash2, User, X } from 'lucide-react';
 
 type DiagnosisFormRow = DiagnosisEntry & {
   id: string;
@@ -199,6 +199,7 @@ export default function NewRequestPage() {
       ...prev,
       studyTypes: sanitizeStudyTypes([...prev.studyTypes, normalizedValue]),
     }));
+    setError('');
   };
 
   const removeStudyType = (value: string) => {
@@ -578,18 +579,14 @@ export default function NewRequestPage() {
     const studyTypes = sanitizeStudyTypes(formData.studyTypes);
     const normalizedPatientName = formData.patientName.trim();
     const splitPatientData = splitPatientName(normalizedPatientName);
-    const hasPendingStudySelection = formData.requestedAction === 'კვლევა' && (
+    const isStudyRequest = formData.requestedAction === 'კვლევა';
+    const hasPendingStudySelection = isStudyRequest && (
       selectedStudyOption.trim().length > 0 ||
       studyTypeInput.trim().length > 0
     );
 
-    if (requiresStructuredFields && hasPendingStudySelection) {
+    if (isStudyRequest && (hasPendingStudySelection || studyTypes.length === 0)) {
       setError('დაამატეთ კვლევა.');
-      return;
-    }
-
-    if (requiresStructuredFields && formData.requestedAction === 'კვლევა' && studyTypes.length === 0) {
-      setError('კვლევის მოთხოვნისთვის მიუთითეთ მინიმუმ ერთი კვლევის ტიპი.');
       return;
     }
 
@@ -831,6 +828,22 @@ export default function NewRequestPage() {
 
   return (
     <div className="w-full max-w-none space-y-6 pb-12">
+      {error && (
+        <div className="fixed bottom-4 left-4 right-4 z-[70] sm:left-auto sm:max-w-md">
+          <div className="flex items-start gap-3 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-2xl shadow-red-200/50">
+            <div className="min-w-0 flex-1 font-medium leading-6">{error}</div>
+            <button
+              type="button"
+              onClick={() => setError('')}
+              className="rounded-full p-1 text-red-500 transition hover:bg-red-100 hover:text-red-700"
+              aria-label="შეცდომის დახურვა"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 sm:gap-4">
         <button
           onClick={() => navigate(-1)}
@@ -844,13 +857,9 @@ export default function NewRequestPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {(error || lookupMessage) && (
-          <div className={`rounded-2xl border px-4 py-3 text-sm ${
-            error
-              ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          }`}>
-            {error || lookupMessage}
+        {lookupMessage && !error && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {lookupMessage}
           </div>
         )}
 
