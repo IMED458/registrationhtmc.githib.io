@@ -270,8 +270,28 @@ export function useRequestNotifications({
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() => getNotificationPermission());
   const [backgroundNotificationCount, setBackgroundNotificationCount] = useState(0);
   const [inAppNotifications, setInAppNotifications] = useState<InAppNotification[]>([]);
+  const activeBrowserNotificationsRef = useRef<Notification[]>([]);
   const previousRequestsRef = useRef<Map<string, RequestMeta>>(new Map());
   const hasHydratedSnapshotRef = useRef(false);
+
+  const closeActiveBrowserNotifications = () => {
+    activeBrowserNotificationsRef.current.forEach((notification) => {
+      try {
+        notification.close();
+      } catch (error) {
+        console.warn('Browser notification close skipped:', error);
+      }
+    });
+
+    activeBrowserNotificationsRef.current = [];
+  };
+
+  const trackBrowserNotification = (notification: Notification) => {
+    activeBrowserNotificationsRef.current = [...activeBrowserNotificationsRef.current, notification];
+    notification.onclose = () => {
+      activeBrowserNotificationsRef.current = activeBrowserNotificationsRef.current.filter((item) => item !== notification);
+    };
+  };
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -295,6 +315,8 @@ export function useRequestNotifications({
     const clearUnreadNotifications = () => {
       if (!isPageInBackground()) {
         setBackgroundNotificationCount(0);
+        setInAppNotifications([]);
+        closeActiveBrowserNotifications();
       }
     };
 
@@ -453,14 +475,14 @@ export function useRequestNotifications({
             icon: NOTIFICATION_ICON_URL,
             badge: NOTIFICATION_ICON_URL,
             tag: payload.tag,
+            requireInteraction: true,
           });
 
           notification.onclick = () => {
             navigateToNotificationTarget(payload.targetPath);
             notification.close();
           };
-
-          window.setTimeout(() => notification.close(), 10000);
+          trackBrowserNotification(notification);
         });
       },
       (error) => {
@@ -470,21 +492,6 @@ export function useRequestNotifications({
 
     return unsubscribe;
   }, [canReceiveRequestNotifications, isAdmin, isRegistrar, notificationPermission, profile]);
-
-  useEffect(() => {
-    if (!inAppNotifications.length) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setInAppNotifications((current) => current.slice(0, -1));
-    }, 7000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [inAppNotifications]);
-
   const requestNotificationPermission = async () => {
     if (!supportsDesktopBrowserNotifications()) {
       setNotificationPermission('unsupported');
@@ -500,9 +507,9 @@ export function useRequestNotifications({
         icon: NOTIFICATION_ICON_URL,
         badge: NOTIFICATION_ICON_URL,
         tag: 'notifications-enabled',
+        requireInteraction: true,
       });
-
-      window.setTimeout(() => notification.close(), 5000);
+      trackBrowserNotification(notification);
     }
 
     return permission;
