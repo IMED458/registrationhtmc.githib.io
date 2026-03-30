@@ -43,6 +43,18 @@ function getBaseRequestActionLabel(request: ClinicalRequest) {
   return request.requestedAction;
 }
 
+function getDesktopFinalDecisionClass(finalDecision?: string | null) {
+  if (finalDecision === 'პაციენტი შემოვიდეს რეგისტრატურაში') {
+    return 'font-black text-red-600';
+  }
+
+  if (finalDecision === 'პაციენტი გაუშვით ბინაზე') {
+    return 'font-black text-slate-950';
+  }
+
+  return cn('font-medium', getFinalDecisionTextClass(finalDecision));
+}
+
 function getRequestActionBadges(request: ClinicalRequest) {
   const baseLabel = getBaseRequestActionLabel(request);
   const consentLabel = request.consentStatus?.trim() || '';
@@ -680,7 +692,7 @@ export default function Dashboard() {
                           {displayStatus}
                         </span>
                         {req.finalDecision && (
-                          <div className={`max-w-xs text-sm font-medium leading-5 whitespace-normal ${getFinalDecisionTextClass(req.finalDecision)}`}>
+                          <div className={`max-w-xs text-sm leading-5 whitespace-normal ${getDesktopFinalDecisionClass(req.finalDecision)}`}>
                             {req.finalDecision}
                           </div>
                         )}
