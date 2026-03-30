@@ -324,6 +324,7 @@ export default function Dashboard() {
       case 'ახალი': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'განხილვაშია': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'მიღებულია': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+      case 'პაციენტი რეგისტრატურაში არ შემოსულა': return 'bg-red-100 text-red-700 border-red-200';
       case 'დადასტურებულია': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'დასრულებულია': return 'bg-slate-100 text-slate-700 border-slate-200';
       case 'უარყოფილია': return 'bg-red-100 text-red-700 border-red-200';
@@ -337,6 +338,7 @@ export default function Dashboard() {
       case 'ახალი': return <Clock className="w-4 h-4" />;
       case 'განხილვაშია': return <MoreHorizontal className="w-4 h-4" />;
       case 'მიღებულია': return <CheckCircle2 className="w-4 h-4" />;
+      case 'პაციენტი რეგისტრატურაში არ შემოსულა': return <XCircle className="w-4 h-4" />;
       case 'დადასტურებულია': return <CheckCircle2 className="w-4 h-4" />;
       case 'დასრულებულია': return <CheckCircle2 className="w-4 h-4" />;
       case 'უარყოფილია': return <XCircle className="w-4 h-4" />;
