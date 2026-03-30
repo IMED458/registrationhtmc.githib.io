@@ -159,7 +159,7 @@ const STATIC_ALLOWED_USERS: Record<string, StaticUserConfig> = {
   'imedashviligio27@gmail.com': {
     ...getRolePermissions('admin'),
     role: 'admin',
-    displayName: 'გ.იმედაშვილი',
+    displayName: 'გიორგი იმედაშვილი',
     canReceiveRequestNotifications: false,
   },
   'nino.nikaberidze@gmail.com': {
@@ -313,7 +313,7 @@ export function resolveUserDisplayName(name?: string | null, email?: string | nu
     case 'eringorokva':
       return 'ემერჯენსი';
     case 'imedashviligio27':
-      return 'გ.იმედაშვილი';
+      return 'გიორგი იმედაშვილი';
     case 'nino.nikaberidze':
       return 'ნინო ნიქაბერიძე';
     case 'giorgit':
