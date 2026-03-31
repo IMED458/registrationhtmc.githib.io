@@ -80,9 +80,21 @@ export function useSheetPatientBackfill(enabled: boolean) {
 
           const nextPersonalId = getTrimmedValue(patientFromSheet.personalId);
           const nextInsurance = getTrimmedValue(patientFromSheet.insurance);
+          const nextFirstName = getTrimmedValue(patientFromSheet.firstName);
+          const nextLastName = getTrimmedValue(patientFromSheet.lastName);
           const currentPersonalId = getTrimmedValue(request.patientData.personalId);
           const currentInsurance = getTrimmedValue(request.patientData.insurance);
+          const currentFirstName = getTrimmedValue(request.patientData.firstName);
+          const currentLastName = getTrimmedValue(request.patientData.lastName);
           const updates: Record<string, string> = {};
+
+          if (nextFirstName && nextFirstName !== currentFirstName) {
+            updates['patientData.firstName'] = nextFirstName;
+          }
+
+          if (nextLastName && nextLastName !== currentLastName) {
+            updates['patientData.lastName'] = nextLastName;
+          }
 
           if (nextPersonalId && nextPersonalId !== currentPersonalId) {
             updates['patientData.personalId'] = nextPersonalId;

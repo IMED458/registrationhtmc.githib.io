@@ -533,6 +533,11 @@ export default function Dashboard() {
                   <div className="mt-1 text-xs text-slate-400">
                     {req.patientData.historyNumber} / {req.patientData.personalId}
                   </div>
+                  {req.patientData.insurance?.trim() && (
+                    <div className="mt-1 text-xs font-medium text-slate-500">
+                      დაზღვევა: {req.patientData.insurance.trim()}
+                    </div>
+                  )}
                 </div>
                 <span className={cn(
                   "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold",
@@ -688,6 +693,11 @@ export default function Dashboard() {
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-slate-700">{req.patientData.historyNumber}</div>
                       <div className="text-xs text-slate-400">{req.patientData.personalId}</div>
+                      {req.patientData.insurance?.trim() && (
+                        <div className="mt-1 text-xs font-medium text-slate-500">
+                          დაზღვევა: {req.patientData.insurance.trim()}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap items-center gap-2">

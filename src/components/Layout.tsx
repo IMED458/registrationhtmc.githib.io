@@ -67,7 +67,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const profileRoleLabel = getAllowedUserConfig(profile?.email)?.label || getRoleLabel(profile?.role);
 
   useArchiveMaintenance(Boolean(profile));
-  useSheetPatientBackfill(Boolean(profile && canCreateRequests && !isRegistrar));
+  useSheetPatientBackfill(Boolean(profile));
 
   const {
     dismissInAppNotification,
