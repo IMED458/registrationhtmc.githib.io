@@ -142,6 +142,10 @@ function getPatientNameTextClass(request: ClinicalRequest) {
     : 'text-slate-900';
 }
 
+function canRegistrarCompleteRequest(request: ClinicalRequest) {
+  return normalizeRequestStatus(resolveRequestStatusFromRequest(request)) !== 'დასრულებულია';
+}
+
 function getRequestPriority(request: ClinicalRequest) {
   const displayStatus = normalizeRequestStatus(resolveRequestStatusFromRequest(request));
 
@@ -403,10 +407,22 @@ export default function Dashboard() {
     setFeedbackMessage('');
 
     try {
+      const completedAt = Timestamp.now();
+
       await updateDoc(doc(db, 'requests', request.id), {
         currentStatus: 'დასრულებულია',
-        updatedAt: Timestamp.now(),
+        updatedAt: completedAt,
       });
+
+      setRequests((current) => normalizeRequestCollection(
+        current.map((item) => item.id === request.id
+          ? {
+              ...item,
+              currentStatus: 'დასრულებულია',
+              updatedAt: completedAt,
+            }
+          : item),
+      ));
 
       await writeAuditLogEntry({
         userId: profile.uid,
