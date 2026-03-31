@@ -590,14 +590,6 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                {req.registrarComment?.trim() && (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">რეგისტრატორის კომენტარი</div>
-                    <div className="mt-1 text-sm font-medium leading-5 text-slate-700">
-                      {req.registrarComment.trim()}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className={`mt-4 grid gap-3 ${isAdmin ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -730,16 +722,6 @@ export default function Dashboard() {
                         {req.finalDecision && (
                           <div className={`max-w-xs text-sm leading-5 whitespace-normal ${getDesktopFinalDecisionClass(req.finalDecision)}`}>
                             {req.finalDecision}
-                          </div>
-                        )}
-                        {req.registrarComment?.trim() && (
-                          <div className="max-w-xs rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-700">
-                            <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                              რეგისტრატორის კომენტარი
-                            </div>
-                            <div className="font-medium whitespace-normal">
-                              {req.registrarComment.trim()}
-                            </div>
                           </div>
                         )}
                       </div>
