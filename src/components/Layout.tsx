@@ -84,7 +84,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const shouldShowNotificationButton =
     supportsNotifications &&
-    (isAdmin || isRegistrar || canReceiveRequestNotifications) &&
+    Boolean(profile) &&
     notificationPermission !== 'granted';
 
   useEffect(() => {

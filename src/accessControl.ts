@@ -109,7 +109,7 @@ function getRolePermissions(role: UserRole): PermissionFlags & { label: string }
         canEditAdminContent: false,
         canFullRequestEdit: false,
         canEditAllRequests: false,
-        canReceiveRequestNotifications: false,
+        canReceiveRequestNotifications: true,
       };
     default:
       return {
@@ -160,7 +160,6 @@ const STATIC_ALLOWED_USERS: Record<string, StaticUserConfig> = {
     ...getRolePermissions('admin'),
     role: 'admin',
     displayName: 'გიორგი იმედაშვილი',
-    canReceiveRequestNotifications: false,
   },
   'nino.nikaberidze@gmail.com': {
     ...getRolePermissions('manager'),
