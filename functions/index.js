@@ -104,11 +104,81 @@ function normalizeText(value) {
   return String(value || '').trim();
 }
 
+function normalizeEmail(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function getTimestampSignature(timestamp) {
+  if (!timestamp) {
+    return '';
+  }
+
+  if (typeof timestamp.toMillis === 'function') {
+    return String(timestamp.toMillis());
+  }
+
+  if (typeof timestamp.seconds === 'number') {
+    return String((timestamp.seconds * 1000) + Math.floor((timestamp.nanoseconds || 0) / 1000000));
+  }
+
+  return String(timestamp);
+}
+
+function normalizeRole(userData) {
+  const directRole = normalizeText(userData?.role);
+
+  if (directRole) {
+    return directRole;
+  }
+
+  const email = normalizeEmail(userData?.email);
+
+  if (email === 'imedashviligio27@gmail.com') {
+    return 'admin';
+  }
+
+  if (email === 'emergencyhtmc14@gmail.com') {
+    return 'registrar';
+  }
+
+  return '';
+}
+
 function getPatientFullName(requestData) {
   const firstName = normalizeText(requestData?.patientData?.firstName);
   const lastName = normalizeText(requestData?.patientData?.lastName);
 
   return `${lastName} ${firstName}`.trim() || 'უცნობი პაციენტი';
+}
+
+function getRequestSummary(requestData) {
+  const consentStatus = normalizeText(requestData?.consentStatus);
+  const requestedAction = normalizeText(requestData?.requestedAction);
+  const department = normalizeText(requestData?.department);
+  const studyTypes = Array.isArray(requestData?.studyTypes)
+    ? requestData.studyTypes.map((value) => normalizeText(value)).filter(Boolean)
+    : [];
+  const studyType = normalizeText(requestData?.studyType);
+
+  if (consentStatus.startsWith('უარი')) {
+    return consentStatus;
+  }
+
+  if (requestedAction === 'სტაციონარი' && department) {
+    return department;
+  }
+
+  if (requestedAction === 'კვლევა') {
+    if (studyTypes.length) {
+      return studyTypes.join(', ');
+    }
+
+    if (studyType) {
+      return studyType;
+    }
+  }
+
+  return requestedAction || 'მოთხოვნა';
 }
 
 function buildStatusSummary(requestData) {
@@ -130,10 +200,109 @@ function buildStatusSummary(requestData) {
   return 'პაციენტის მოთხოვნა განახლდა';
 }
 
+function isPendingAdminConfirmationData(requestData) {
+  return requestData?.adminConfirmationStatus === 'pending' &&
+    Boolean(requestData?.pendingRegistrarUpdate || requestData?.pendingDoctorEdit);
+}
+
+function buildRequestMeta(requestData) {
+  return {
+    adminFeedActivity: [
+      getTimestampSignature(requestData?.pendingRegistrarUpdate?.requestedAt),
+      getTimestampSignature(requestData?.pendingDoctorEdit?.editedAt),
+      normalizeText(requestData?.adminConfirmationStatus),
+      String(Boolean(requestData?.requiresRegistrarAction)),
+    ].join('|'),
+    doctorEditActivity: [
+      getTimestampSignature(requestData?.lastDoctorEditAt),
+      normalizeText(requestData?.pendingDoctorEdit?.comment),
+      normalizeText(requestData?.pendingDoctorEdit?.editedByUserId),
+      String(Boolean(requestData?.requiresRegistrarAction)),
+    ].join('|'),
+    finalDecision: normalizeText(requestData?.finalDecision),
+    hasPendingApproval: isPendingAdminConfirmationData(requestData),
+    registrarActivity: [
+      getTimestampSignature(requestData?.lastRegistrarEditAt),
+      normalizeText(requestData?.registrarComment),
+      normalizeText(requestData?.registrarName),
+      normalizeText(requestData?.formFillerName),
+    ].join('|'),
+    requiresRegistrarAction: Boolean(requestData?.requiresRegistrarAction),
+    status: normalizeText(requestData?.currentStatus),
+  };
+}
+
+function buildTargetUrl(requestId) {
+  return `${WEB_APP_BASE_URL}#/request/${requestId}`;
+}
+
+function buildNotificationMessage(title, body, tag, requestId) {
+  return {
+    title,
+    body,
+    tag,
+    requestId,
+    targetUrl: buildTargetUrl(requestId),
+  };
+}
+
+function buildRegistrarNotificationMessage(requestData, requestId) {
+  const patientFullName = getPatientFullName(requestData);
+  const sender = normalizeText(requestData?.createdByUserName) || normalizeText(requestData?.createdByUserEmail) || 'თანამშრომელი';
+  const summary = getRequestSummary(requestData);
+  const registrarEditComment = normalizeText(requestData?.pendingDoctorEdit?.comment);
+
+  if (requestData?.requiresRegistrarAction && registrarEditComment) {
+    return buildNotificationMessage(
+      'მოთხოვნა განახლდა',
+      `${patientFullName} • ${registrarEditComment}`,
+      `registrar-update-${requestId}-${getTimestampSignature(requestData?.updatedAt) || 'now'}`,
+      requestId,
+    );
+  }
+
+  return buildNotificationMessage(
+    'ახალი მოთხოვნა',
+    `${patientFullName} • ${summary} • გამომგზავნი: ${sender}`,
+    `registrar-request-${requestId}-${getTimestampSignature(requestData?.createdAt) || 'now'}`,
+    requestId,
+  );
+}
+
+function buildAdminNotificationMessage(requestData, requestId) {
+  const patientFullName = getPatientFullName(requestData);
+  const requestedBy =
+    normalizeText(requestData?.pendingRegistrarUpdate?.requestedByUserName) ||
+    normalizeText(requestData?.pendingDoctorEdit?.editedByUserName) ||
+    normalizeText(requestData?.createdByUserName) ||
+    normalizeText(requestData?.createdByUserEmail) ||
+    'თანამშრომელი';
+  const requiresApproval = isPendingAdminConfirmationData(requestData);
+
+  return buildNotificationMessage(
+    requiresApproval ? 'ახალი დადასტურება' : 'ახალი ცვლილება',
+    requiresApproval
+      ? `${patientFullName} • ცვლილება ელოდება დადასტურებას • ${requestedBy}`
+      : `${patientFullName} • ცვლილება დაფიქსირდა • ${requestedBy}`,
+    `${requiresApproval ? 'admin-approval' : 'admin-update'}-${requestId}-${getTimestampSignature(requestData?.updatedAt) || 'now'}`,
+    requestId,
+  );
+}
+
+function getNotificationTokens(userData) {
+  return Array.isArray(userData?.notificationTokens)
+    ? userData.notificationTokens.filter((token) => typeof token === 'string' && token.trim())
+    : [];
+}
+
 function hasDoctorVisibleUpdate(beforeData, afterData) {
+  const beforeMeta = buildRequestMeta(beforeData);
+  const afterMeta = buildRequestMeta(afterData);
+
   return (
-    normalizeText(beforeData?.currentStatus) !== normalizeText(afterData?.currentStatus) ||
-    normalizeText(beforeData?.finalDecision) !== normalizeText(afterData?.finalDecision)
+    beforeMeta.status !== afterMeta.status ||
+    beforeMeta.finalDecision !== afterMeta.finalDecision ||
+    (Boolean(afterMeta.registrarActivity) && beforeMeta.registrarActivity !== afterMeta.registrarActivity)
   );
 }
 
@@ -149,6 +318,177 @@ async function removeInvalidTokens(userId, tokensToRemove) {
     { merge: true },
   );
 }
+
+async function getUsersByRoles(roles) {
+  const requestedRoles = new Set(roles.map((role) => normalizeText(role)).filter(Boolean));
+
+  if (!requestedRoles.size) {
+    return [];
+  }
+
+  const snapshot = await firestore.collection('users').get();
+
+  return snapshot.docs
+    .map((userDoc) => ({
+      id: userDoc.id,
+      data: userDoc.data() || {},
+    }))
+    .filter((userRecord) => {
+      if (userRecord.data?.isActive === false) {
+        return false;
+      }
+
+      return requestedRoles.has(normalizeRole(userRecord.data));
+    });
+}
+
+async function sendNotificationToUsers(userRecords, message) {
+  const tokenOwners = new Map();
+  const tokens = [];
+
+  userRecords.forEach((userRecord) => {
+    getNotificationTokens(userRecord.data).forEach((token) => {
+      if (!tokenOwners.has(token)) {
+        tokenOwners.set(token, userRecord.id);
+        tokens.push(token);
+      }
+    });
+  });
+
+  if (!tokens.length) {
+    return null;
+  }
+
+  const response = await admin.messaging().sendEachForMulticast({
+    tokens,
+    notification: {
+      title: message.title,
+      body: message.body,
+    },
+    data: {
+      body: message.body,
+      requestId: message.requestId,
+      tag: message.tag,
+      title: message.title,
+      url: message.targetUrl,
+    },
+    webpush: {
+      notification: {
+        title: message.title,
+        body: message.body,
+        icon: WEB_APP_ICON_URL,
+        badge: WEB_APP_ICON_URL,
+        tag: message.tag,
+        data: {
+          url: message.targetUrl,
+        },
+      },
+      fcmOptions: {
+        link: message.targetUrl,
+      },
+    },
+  });
+
+  const invalidTokensByUserId = new Map();
+
+  response.responses.forEach((result, index) => {
+    if (result.success) {
+      return;
+    }
+
+    const errorCode = result.error?.code || '';
+
+    if (
+      errorCode === 'messaging/registration-token-not-registered' ||
+      errorCode === 'messaging/invalid-registration-token'
+    ) {
+      const token = tokens[index];
+      const userId = tokenOwners.get(token);
+
+      if (!userId) {
+        return;
+      }
+
+      const currentTokens = invalidTokensByUserId.get(userId) || [];
+      currentTokens.push(token);
+      invalidTokensByUserId.set(userId, currentTokens);
+    }
+  });
+
+  await Promise.all(
+    Array.from(invalidTokensByUserId.entries()).map(([userId, invalidTokens]) =>
+      removeInvalidTokens(userId, invalidTokens),
+    ),
+  );
+
+  return response;
+}
+
+exports.notifyRegistrarsOnNewRequest = functions
+  .region('us-central1')
+  .firestore.document('requests/{requestId}')
+  .onCreate(async (snapshot, context) => {
+    const requestData = snapshot.data();
+
+    if (!requestData) {
+      return null;
+    }
+
+    const registrars = await getUsersByRoles(['registrar']);
+
+    return sendNotificationToUsers(
+      registrars,
+      buildRegistrarNotificationMessage(requestData, context.params.requestId),
+    );
+  });
+
+exports.notifyAdminAndRegistrarFeeds = functions
+  .region('us-central1')
+  .firestore.document('requests/{requestId}')
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data();
+    const afterData = change.after.data();
+
+    if (!beforeData || !afterData) {
+      return null;
+    }
+
+    const beforeMeta = buildRequestMeta(beforeData);
+    const afterMeta = buildRequestMeta(afterData);
+    const tasks = [];
+
+    if (afterMeta.requiresRegistrarAction && beforeMeta.doctorEditActivity !== afterMeta.doctorEditActivity) {
+      tasks.push(
+        getUsersByRoles(['registrar']).then((registrars) =>
+          sendNotificationToUsers(
+            registrars,
+            buildRegistrarNotificationMessage(afterData, context.params.requestId),
+          ),
+        ),
+      );
+    }
+
+    if (
+      beforeMeta.adminFeedActivity !== afterMeta.adminFeedActivity &&
+      (afterMeta.hasPendingApproval || Boolean(afterData.pendingDoctorEdit) || Boolean(afterData.pendingRegistrarUpdate))
+    ) {
+      tasks.push(
+        getUsersByRoles(['admin']).then((admins) =>
+          sendNotificationToUsers(
+            admins,
+            buildAdminNotificationMessage(afterData, context.params.requestId),
+          ),
+        ),
+      );
+    }
+
+    if (!tasks.length) {
+      return null;
+    }
+
+    await Promise.all(tasks);
+    return null;
+  });
 
 exports.notifyRequestOwnerOnStatusChange = functions
   .region('us-central1')
@@ -174,66 +514,19 @@ exports.notifyRequestOwnerOnStatusChange = functions
     }
 
     const userData = userSnapshot.data() || {};
-    const notificationTokens = Array.isArray(userData.notificationTokens)
-      ? userData.notificationTokens.filter((token) => typeof token === 'string' && token.trim())
-      : [];
+    const notificationTokens = getNotificationTokens(userData);
 
     if (!notificationTokens.length) {
       return null;
     }
 
-    const patientFullName = getPatientFullName(afterData);
-    const body = `${patientFullName} • ${buildStatusSummary(afterData)}`;
-    const targetUrl = `${WEB_APP_BASE_URL}#/request/${context.params.requestId}`;
-
-    const response = await admin.messaging().sendEachForMulticast({
-      tokens: notificationTokens,
-      notification: {
-        title: 'პაციენტის სტატუსი განახლდა',
-        body,
-      },
-      data: {
-        requestId: context.params.requestId,
-        title: 'პაციენტის სტატუსი განახლდა',
-        body,
-        url: targetUrl,
-        tag: `request-status-${context.params.requestId}`,
-      },
-      webpush: {
-        notification: {
-          title: 'პაციენტის სტატუსი განახლდა',
-          body,
-          icon: WEB_APP_ICON_URL,
-          badge: WEB_APP_ICON_URL,
-          tag: `request-status-${context.params.requestId}`,
-          data: {
-            url: targetUrl,
-          },
-        },
-        fcmOptions: {
-          link: targetUrl,
-        },
-      },
-    });
-
-    const invalidTokens = [];
-
-    response.responses.forEach((result, index) => {
-      if (!result.success) {
-        const errorCode = result.error?.code || '';
-
-        if (
-          errorCode === 'messaging/registration-token-not-registered' ||
-          errorCode === 'messaging/invalid-registration-token'
-        ) {
-          invalidTokens.push(notificationTokens[index]);
-        }
-      }
-    });
-
-    if (invalidTokens.length) {
-      await removeInvalidTokens(requestOwnerId, invalidTokens);
-    }
-
-    return null;
+    return sendNotificationToUsers(
+      [{ id: requestOwnerId, data: userData }],
+      buildNotificationMessage(
+        'პაციენტის სტატუსი განახლდა',
+        `${getPatientFullName(afterData)} • ${buildStatusSummary(afterData)}`,
+        `request-status-${context.params.requestId}`,
+        context.params.requestId,
+      ),
+    );
   });

@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { resolveUserDisplayName } from './accessControl';
 import { isArchivedRequest } from './archiveUtils';
 import { db } from './firebase';
+import { enablePushNotifications, syncExistingPushNotifications } from './pushNotifications';
 import { normalizeRequestStatus, resolveRequestStatusFromRequest } from './requestStatusUtils';
 import { ClinicalRequest, UserProfile } from './types';
 
@@ -330,6 +331,14 @@ export function useRequestNotifications({
   }, []);
 
   useEffect(() => {
+    if (!profile || notificationPermission !== 'granted' || !supportsDesktopBrowserNotifications()) {
+      return;
+    }
+
+    void syncExistingPushNotifications(profile);
+  }, [notificationPermission, profile]);
+
+  useEffect(() => {
     previousRequestsRef.current = new Map();
     hasHydratedSnapshotRef.current = false;
 
@@ -492,18 +501,32 @@ export function useRequestNotifications({
 
     return unsubscribe;
   }, [canReceiveRequestNotifications, isAdmin, isRegistrar, notificationPermission, profile]);
+
   const requestNotificationPermission = async () => {
     if (!supportsDesktopBrowserNotifications()) {
       setNotificationPermission('unsupported');
       return 'unsupported';
     }
 
-    const permission = await window.Notification.requestPermission();
+    let permission: NotificationPermissionState;
+
+    if (profile) {
+      try {
+        const result = await enablePushNotifications(profile);
+        permission = result.permission;
+      } catch (error) {
+        console.warn('Push notification enable failed, falling back to browser permission:', error);
+        permission = await window.Notification.requestPermission();
+      }
+    } else {
+      permission = await window.Notification.requestPermission();
+    }
+
     setNotificationPermission(permission);
 
     if (permission === 'granted') {
       const notification = new window.Notification('შეტყობინებები ჩართულია', {
-        body: 'ახლა ახალი მოთხოვნა და რეგისტრატორის ცვლილებები ბრაუზერში შეგახსენდება, მაშინაც თუ სხვა თაბზე ხართ.',
+        body: 'ახლა ახალი მოთხოვნა და ცვლილებები შეტყობინებად გამოჩნდება, მათ შორის მაშინაც თუ სხვა თაბზე ხართ.',
         icon: NOTIFICATION_ICON_URL,
         badge: NOTIFICATION_ICON_URL,
         tag: 'notifications-enabled',
