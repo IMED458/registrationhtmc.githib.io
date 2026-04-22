@@ -104,10 +104,22 @@ function mapPatientFromRows(
   };
 }
 
+function isOneDriveUrl(url: string): boolean {
+  return /1drv\.ms|onedrive\.live\.com|sharepoint\.com/i.test(url);
+}
+
+function buildOneDriveDownloadUrl(shareUrl: string): string {
+  const base64 = btoa(shareUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `https://api.onedrive.com/v1.0/shares/u!${base64}/root/content`;
+}
+
 async function fetchWorkbookSheets(settings: SystemSettings, options?: LookupPatientOptions) {
-  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
+  const rawId = settings.googleSheetsId?.trim() || '';
   const preferredSheetName = settings.sheetName?.trim() || '';
-  const cacheKey = `${spreadsheetId}::${preferredSheetName || '*'}`;
+
+  const cacheKey = isOneDriveUrl(rawId)
+    ? `onedrive::${rawId}::${preferredSheetName || '*'}`
+    : `${extractSpreadsheetId(rawId)}::${preferredSheetName || '*'}`;
 
   if (options?.forceRefresh) {
     workbookSheetsPromiseByKey.delete(cacheKey);
@@ -117,7 +129,15 @@ async function fetchWorkbookSheets(settings: SystemSettings, options?: LookupPat
 
   if (!workbookSheetsPromise) {
     workbookSheetsPromise = (async () => {
-      const workbookUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+      let workbookUrl: string;
+
+      if (isOneDriveUrl(rawId)) {
+        workbookUrl = buildOneDriveDownloadUrl(rawId);
+      } else {
+        const spreadsheetId = extractSpreadsheetId(rawId);
+        workbookUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+      }
+
       const response = await fetch(workbookUrl, { cache: 'no-store' });
 
       if (!response.ok) {
