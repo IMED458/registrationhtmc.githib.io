@@ -1,10 +1,10 @@
 import { SystemSettings } from './types';
 
 export const LEGACY_DEFAULT_GOOGLE_SHEET_URL =
-  'https://docs.google.com/spreadsheets/d/1sBG8LsgOrRhkvibB0cOpLihW8GEI1YhP/edit?usp=sharing&ouid=104679229217623816115&rtpof=true&sd=true';
+  'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=19k9nf';
 
 export const DEFAULT_GOOGLE_SHEET_URL =
-  'https://docs.google.com/spreadsheets/d/1zsuLPC1hDVJ1pzGMsk_LY1bILCF6Dbd7/edit?gid=226530235#gid=226530235';
+  'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=19k9nf';
 
 export const DEFAULT_GOOGLE_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbyij6Xs4vi97zRAYQ-80TKEoJWKWZsNiedUn6GsiKBxZFUU2HnRwovBNfkwRRFCVwH0/exec';
