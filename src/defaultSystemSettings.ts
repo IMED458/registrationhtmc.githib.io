@@ -4,7 +4,7 @@ export const LEGACY_DEFAULT_GOOGLE_SHEET_URL =
   'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=19k9nf';
 
 export const DEFAULT_GOOGLE_SHEET_URL =
-  'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=19k9nf';
+  'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=cOHEat';
 
 export const DEFAULT_GOOGLE_APPS_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbyij6Xs4vi97zRAYQ-80TKEoJWKWZsNiedUn6GsiKBxZFUU2HnRwovBNfkwRRFCVwH0/exec';
