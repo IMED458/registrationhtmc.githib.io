@@ -75,6 +75,9 @@ function mapPatientFromRows(
   const historyNumberIndex = columnLetterToIndex(settings.columnMapping.historyNumber || 'F');
   const personalIdIndex = columnLetterToIndex(settings.columnMapping.personalId || 'D');
   const insuranceIndex = columnLetterToIndex(settings.columnMapping.insurance || 'E');
+  const birthDateIndex = columnLetterToIndex(settings.columnMapping.birthDate || '');
+  const phoneIndex = columnLetterToIndex(settings.columnMapping.phone || '');
+  const addressIndex = columnLetterToIndex(settings.columnMapping.address || '');
   const normalizedHistoryNumber = historyNumber.trim();
   const normalizedPersonalId = personalId.trim();
 
@@ -97,10 +100,10 @@ function mapPatientFromRows(
     lastName: normalizeCellValue(row[lastNameIndex]),
     historyNumber: normalizeCellValue(row[historyNumberIndex]),
     personalId: normalizeCellValue(row[personalIdIndex]),
-    birthDate: '',
+    birthDate: birthDateIndex >= 0 ? normalizeCellValue(row[birthDateIndex]) : '',
     insurance: insuranceIndex >= 0 ? normalizeCellValue(row[insuranceIndex]) : '',
-    phone: '',
-    address: '',
+    phone: phoneIndex >= 0 ? normalizeCellValue(row[phoneIndex]) : '',
+    address: addressIndex >= 0 ? normalizeCellValue(row[addressIndex]) : '',
   };
 }
 
