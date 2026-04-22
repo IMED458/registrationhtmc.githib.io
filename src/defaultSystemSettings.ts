@@ -35,12 +35,23 @@ function extractSpreadsheetId(value: string) {
   return match ? match[1] : trimmedValue;
 }
 
+function isOneDriveUrl(value: string): boolean {
+  return /1drv\.ms|onedrive\.live\.com|sharepoint\.com/i.test(value);
+}
+
 function shouldUseNewDefaultSheetSource(googleSheetsId?: string) {
-  const normalizedValue = extractSpreadsheetId(String(googleSheetsId || ''));
+  const raw = String(googleSheetsId || '').trim();
+
+  if (!raw) return true;
+
+  // თუ ნებისმიერი OneDrive URL-ია — ჩავთვლოთ default-ად და ახალი URL-ით გავცვალოთ
+  if (isOneDriveUrl(raw)) return true;
+
+  const normalizedValue = extractSpreadsheetId(raw);
   const legacyId = extractSpreadsheetId(LEGACY_DEFAULT_GOOGLE_SHEET_URL);
   const currentId = extractSpreadsheetId(DEFAULT_GOOGLE_SHEET_URL);
 
-  return !normalizedValue || normalizedValue === legacyId || normalizedValue === currentId;
+  return normalizedValue === legacyId || normalizedValue === currentId;
 }
 
 export function normalizeSystemSettings(input?: Partial<SystemSettings> | null): SystemSettings {
