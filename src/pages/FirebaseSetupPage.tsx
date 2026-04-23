@@ -99,9 +99,9 @@ export default function FirebaseSetupPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900">Google Sheet სატესტო ძებნა</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Excel წყაროს სატესტო ძებნა</h2>
           <p className="mt-2 text-slate-600">
-            ქვემოთ უკვე მუშაობს იმ Sheet-დან წამოღება, რომელიც მომწერე. შეგიძლია გადაამოწმო `ისტ N` ან `პირადი N`-ით.
+            ქვემოთ უკვე მუშაობს იმ Excel წყაროდან წამოღება, რომელიც მომწერე. შეგიძლია გადაამოწმო `ისტ N` ან `პირადი N`-ით.
           </p>
 
           <form onSubmit={handleLookup} className="mt-6 space-y-4">

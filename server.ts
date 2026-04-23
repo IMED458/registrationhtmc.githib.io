@@ -42,6 +42,53 @@ function extractSpreadsheetId(value: string) {
   return match ? match[1] : trimmedValue;
 }
 
+function isGoogleSheetsSource(value: string) {
+  return /docs\.google\.com\/spreadsheets\/d\//i.test(value);
+}
+
+function isOneDriveSource(value: string) {
+  return /(?:1drv\.ms|onedrive\.live\.com)/i.test(value);
+}
+
+function buildOneDriveApiDownloadUrl(shareUrl: string) {
+  const encodedShareUrl = Buffer.from(shareUrl)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  return `https://api.onedrive.com/v1.0/shares/u!${encodedShareUrl}/root/content`;
+}
+
+function buildOneDriveDirectDownloadUrl(shareUrl: string) {
+  const workbookUrl = new URL(shareUrl);
+
+  if (!workbookUrl.searchParams.has("download")) {
+    workbookUrl.searchParams.set("download", "1");
+  }
+
+  return workbookUrl.toString();
+}
+
+function buildWorkbookUrlCandidates(value: string) {
+  const normalizedValue = value.trim();
+
+  if (isGoogleSheetsSource(normalizedValue)) {
+    const spreadsheetId = extractSpreadsheetId(normalizedValue);
+    return [`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`];
+  }
+
+  if (isOneDriveSource(normalizedValue)) {
+    return [
+      buildOneDriveApiDownloadUrl(normalizedValue),
+      buildOneDriveDirectDownloadUrl(normalizedValue),
+      normalizedValue,
+    ];
+  }
+
+  return [normalizedValue];
+}
+
 function extractSheetGid(settings: SystemSettings) {
   if (settings.sheetGid?.trim()) {
     return settings.sheetGid.trim();
@@ -183,6 +230,10 @@ async function updateSheetRequestData(
   department: string,
   consentStatus: string,
 ) {
+  if (!isGoogleSheetsSource(settings.googleSheetsId)) {
+    throw new Error("Sheet sync is supported only for Google Sheets sources.");
+  }
+
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
   const sheets = google.sheets({ version: "v4", auth });
@@ -291,29 +342,46 @@ async function fetchPublicSheetRows(settings: SystemSettings): Promise<WorkbookS
 }
 
 async function fetchWorkbookSheetRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
-  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
-  const response = await fetch(url);
+  const workbookUrlCandidates = buildWorkbookUrlCandidates(settings.googleSheetsId);
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(`Workbook fetch failed with status ${response.status}`);
+  for (const workbookUrl of workbookUrlCandidates) {
+    try {
+      const response = await fetch(workbookUrl);
+
+      if (!response.ok) {
+        throw new Error(`Workbook fetch failed with status ${response.status}`);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (/text\/html|application\/json/i.test(contentType)) {
+        throw new Error(
+          "Workbook source returned HTML instead of an Excel file. გადაამოწმეთ OneDrive sharing link.",
+        );
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const orderedSheetNames = prioritizeSheetNames(
+        workbook.SheetNames,
+        settings.sheetName?.trim(),
+      );
+
+      return orderedSheetNames.map((sheetName) => ({
+        sheetName,
+        rows: XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[sheetName], {
+          header: 1,
+          defval: "",
+          raw: false,
+        }) as string[][],
+      }));
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const orderedSheetNames = prioritizeSheetNames(
-    workbook.SheetNames,
-    settings.sheetName?.trim(),
-  );
-
-  return orderedSheetNames.map((sheetName) => ({
-    sheetName,
-    rows: XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[sheetName], {
-      header: 1,
-      defval: "",
-      raw: false,
-    }) as string[][],
-  }));
+  throw lastError || new Error("Workbook source fetch failed.");
 }
 
 async function fetchGoogleApiRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
@@ -343,6 +411,10 @@ async function fetchGoogleApiRows(settings: SystemSettings): Promise<WorkbookShe
 }
 
 async function fetchSheetRows(settings: SystemSettings): Promise<WorkbookSheetRows[]> {
+  if (!isGoogleSheetsSource(settings.googleSheetsId)) {
+    return await fetchWorkbookSheetRows(settings);
+  }
+
   try {
     return await fetchWorkbookSheetRows(settings);
   } catch (workbookError) {
@@ -462,8 +534,8 @@ async function startServer() {
 
       res.json(patientMatch.patient);
     } catch (error: any) {
-      console.error("Google Sheets Error:", error);
-      res.status(500).json({ error: "Failed to fetch from Google Sheets", details: error.message });
+      console.error("Workbook source error:", error);
+      res.status(500).json({ error: "Failed to fetch from workbook source", details: error.message });
     }
   });
 
@@ -501,9 +573,9 @@ async function startServer() {
         ...result,
       });
     } catch (error: any) {
-      console.error("Google Sheets Sync Error:", error);
+      console.error("Workbook sync error:", error);
       res.status(500).json({
-        error: "Failed to sync request to Google Sheets",
+        error: "Failed to sync request to workbook source",
         details: error.message,
       });
     }

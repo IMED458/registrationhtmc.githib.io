@@ -4,11 +4,14 @@ const XLSX = require('xlsx');
 const LEGACY_DEFAULT_GOOGLE_SHEET_URL =
   'https://docs.google.com/spreadsheets/d/1sBG8LsgOrRhkvibB0cOpLihW8GEI1YhP/edit?usp=sharing&ouid=104679229217623816115&rtpof=true&sd=true';
 
-const DEFAULT_GOOGLE_SHEET_URL =
+const PREVIOUS_DEFAULT_GOOGLE_SHEET_URL =
   'https://docs.google.com/spreadsheets/d/1zsuLPC1hDVJ1pzGMsk_LY1bILCF6Dbd7/edit?gid=226530235#gid=226530235';
 
+const DEFAULT_EXTERNAL_WORKBOOK_URL =
+  'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=cOHEat';
+
 const DEFAULT_SYSTEM_SETTINGS = {
-  googleSheetsId: DEFAULT_GOOGLE_SHEET_URL,
+  googleSheetsId: DEFAULT_EXTERNAL_WORKBOOK_URL,
   googleDriveFolderId: '',
   sheetName: '',
   sheetGid: '',
@@ -40,9 +43,9 @@ function getGoogleAuthClient() {
 }
 
 function shouldUseNewDefaultSheetSource(googleSheetsId) {
-  const normalizedValue = extractSpreadsheetId(String(googleSheetsId || ''));
+  const normalizedValue = String(googleSheetsId || '').trim();
   const legacyId = extractSpreadsheetId(LEGACY_DEFAULT_GOOGLE_SHEET_URL);
-  const currentId = extractSpreadsheetId(DEFAULT_GOOGLE_SHEET_URL);
+  const currentId = extractSpreadsheetId(PREVIOUS_DEFAULT_GOOGLE_SHEET_URL);
 
   return !normalizedValue || normalizedValue === legacyId || normalizedValue === currentId;
 }
@@ -58,7 +61,7 @@ function mergeSystemSettings(input) {
   };
 
   if (shouldUseNewDefaultSheetSource(mergedSettings.googleSheetsId)) {
-    mergedSettings.googleSheetsId = DEFAULT_GOOGLE_SHEET_URL;
+    mergedSettings.googleSheetsId = DEFAULT_EXTERNAL_WORKBOOK_URL;
 
     if (!mergedSettings.sheetName || String(mergedSettings.sheetName).trim() === 'თებერვალი') {
       mergedSettings.sheetName = '';
@@ -72,6 +75,53 @@ function extractSpreadsheetId(value) {
   const trimmedValue = String(value || '').trim();
   const match = trimmedValue.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   return match ? match[1] : trimmedValue;
+}
+
+function isGoogleSheetsSource(value) {
+  return /docs\.google\.com\/spreadsheets\/d\//i.test(String(value || ''));
+}
+
+function isOneDriveSource(value) {
+  return /(?:1drv\.ms|onedrive\.live\.com)/i.test(String(value || ''));
+}
+
+function buildOneDriveApiDownloadUrl(shareUrl) {
+  const encodedShareUrl = Buffer.from(String(shareUrl || ''))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  return `https://api.onedrive.com/v1.0/shares/u!${encodedShareUrl}/root/content`;
+}
+
+function buildOneDriveDirectDownloadUrl(shareUrl) {
+  const workbookUrl = new URL(String(shareUrl || '').trim());
+
+  if (!workbookUrl.searchParams.has('download')) {
+    workbookUrl.searchParams.set('download', '1');
+  }
+
+  return workbookUrl.toString();
+}
+
+function buildWorkbookUrlCandidates(value) {
+  const normalizedValue = String(value || '').trim();
+
+  if (isGoogleSheetsSource(normalizedValue)) {
+    const spreadsheetId = extractSpreadsheetId(normalizedValue);
+    return [`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`];
+  }
+
+  if (isOneDriveSource(normalizedValue)) {
+    return [
+      buildOneDriveApiDownloadUrl(normalizedValue),
+      buildOneDriveDirectDownloadUrl(normalizedValue),
+      normalizedValue,
+    ];
+  }
+
+  return [normalizedValue];
 }
 
 function extractSheetGid(settings) {
@@ -218,6 +268,10 @@ function findPatientInSheetEntries(sheetEntries, settings, historyNumber, person
 }
 
 async function updateSheetRequestData(settings, historyNumber, personalId, icdCode, requestedAction, department, consentStatus) {
+  if (!isGoogleSheetsSource(settings.googleSheetsId)) {
+    throw new Error('Sheet sync is supported only for Google Sheets sources.');
+  }
+
   const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
   const auth = getGoogleAuthClient();
   const sheets = google.sheets({ version: 'v4', auth });
@@ -318,30 +372,44 @@ async function fetchPublicSheetRows(settings) {
 }
 
 async function fetchWorkbookSheetRows(settings) {
-  const spreadsheetId = extractSpreadsheetId(settings.googleSheetsId);
-  const response = await fetch(
-    `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`,
-  );
+  const workbookUrlCandidates = buildWorkbookUrlCandidates(settings.googleSheetsId);
+  let lastError = null;
 
-  if (!response.ok) {
-    throw new Error(`Workbook fetch failed with status ${response.status}`);
+  for (const workbookUrl of workbookUrlCandidates) {
+    try {
+      const response = await fetch(workbookUrl);
+
+      if (!response.ok) {
+        throw new Error(`Workbook fetch failed with status ${response.status}`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+
+      if (/text\/html|application\/json/i.test(contentType)) {
+        throw new Error('Workbook source returned HTML instead of an Excel file. გადაამოწმეთ OneDrive sharing link.');
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const orderedSheetNames = prioritizeSheetNames(
+        workbook.SheetNames,
+        String(settings.sheetName || '').trim(),
+      );
+
+      return orderedSheetNames.map((sheetName) => ({
+        sheetName,
+        rows: XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+          header: 1,
+          defval: '',
+          raw: false,
+        }),
+      }));
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const orderedSheetNames = prioritizeSheetNames(
-    workbook.SheetNames,
-    String(settings.sheetName || '').trim(),
-  );
-
-  return orderedSheetNames.map((sheetName) => ({
-    sheetName,
-    rows: XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-      header: 1,
-      defval: '',
-      raw: false,
-    }),
-  }));
+  throw lastError || new Error('Workbook source fetch failed.');
 }
 
 async function fetchGoogleApiRows(settings) {
@@ -371,6 +439,10 @@ async function fetchGoogleApiRows(settings) {
 }
 
 async function fetchSheetRows(settings) {
+  if (!isGoogleSheetsSource(settings.googleSheetsId)) {
+    return fetchWorkbookSheetRows(settings);
+  }
+
   try {
     return await fetchWorkbookSheetRows(settings);
   } catch (workbookError) {

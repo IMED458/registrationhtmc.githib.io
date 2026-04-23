@@ -5,6 +5,10 @@ import { SystemSettings } from './types';
 
 const configuredAppsScriptUrl = import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL?.trim() || '';
 
+function isGoogleSheetsSource(value?: string | null) {
+  return /docs\.google\.com\/spreadsheets\/d\//i.test(String(value || ''));
+}
+
 type SyncRequestToSheetInput = {
   consentStatus: string;
   department: string;
@@ -42,10 +46,16 @@ export async function syncRequestToSheet({
   const normalizedPersonalId = personalId.trim();
   const normalizedIcdCode = icdCode.trim();
   const resolvedSettings = settings ?? await loadSystemSettings();
+  const workbookSource = String(resolvedSettings?.googleSheetsId || '').trim();
   const appsScriptUrl = resolveAppsScriptUrl(resolvedSettings);
   const sheetSyncUrl = appsScriptUrl || resolveServerApiUrl('/api/external/sync-request');
 
-  if ((!normalizedHistoryNumber && !normalizedPersonalId) || !normalizedIcdCode || !sheetSyncUrl) {
+  if (
+    (!normalizedHistoryNumber && !normalizedPersonalId) ||
+    !normalizedIcdCode ||
+    !sheetSyncUrl ||
+    !isGoogleSheetsSource(workbookSource)
+  ) {
     return false;
   }
 

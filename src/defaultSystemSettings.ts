@@ -3,14 +3,16 @@ import { SystemSettings } from './types';
 export const LEGACY_DEFAULT_GOOGLE_SHEET_URL =
   'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=19k9nf';
 
-export const DEFAULT_GOOGLE_SHEET_URL =
+export const PREVIOUS_DEFAULT_GOOGLE_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/1zsuLPC1hDVJ1pzGMsk_LY1bILCF6Dbd7/edit?gid=226530235#gid=226530235';
+
+export const DEFAULT_EXTERNAL_WORKBOOK_URL =
   'https://1drv.ms/x/c/bb8b8bedd175f306/IQCHT5OMdKEvQ7PTXLCUSuVXAU1lFxSNfDkyFh4iqezedtM?e=cOHEat';
 
-export const DEFAULT_GOOGLE_APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbyij6Xs4vi97zRAYQ-80TKEoJWKWZsNiedUn6GsiKBxZFUU2HnRwovBNfkwRRFCVwH0/exec';
+export const DEFAULT_GOOGLE_APPS_SCRIPT_URL = '';
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
-  googleSheetsId: DEFAULT_GOOGLE_SHEET_URL,
+  googleSheetsId: DEFAULT_EXTERNAL_WORKBOOK_URL,
   googleAppsScriptUrl: DEFAULT_GOOGLE_APPS_SCRIPT_URL,
   googleDriveFolderId: '',
   sheetName: '',
@@ -35,23 +37,16 @@ function extractSpreadsheetId(value: string) {
   return match ? match[1] : trimmedValue;
 }
 
-function isOneDriveUrl(value: string): boolean {
-  return /1drv\.ms|onedrive\.live\.com|sharepoint\.com/i.test(value);
-}
-
 function shouldUseNewDefaultSheetSource(googleSheetsId?: string) {
-  const raw = String(googleSheetsId || '').trim();
+  const normalizedValue = String(googleSheetsId || '').trim();
+  const previousGoogleId = extractSpreadsheetId(PREVIOUS_DEFAULT_GOOGLE_SHEET_URL);
 
-  if (!raw) return true;
-
-  // თუ ნებისმიერი OneDrive URL-ია — ჩავთვლოთ default-ად და ახალი URL-ით გავცვალოთ
-  if (isOneDriveUrl(raw)) return true;
-
-  const normalizedValue = extractSpreadsheetId(raw);
-  const legacyId = extractSpreadsheetId(LEGACY_DEFAULT_GOOGLE_SHEET_URL);
-  const currentId = extractSpreadsheetId(DEFAULT_GOOGLE_SHEET_URL);
-
-  return normalizedValue === legacyId || normalizedValue === currentId;
+  return (
+    !normalizedValue ||
+    normalizedValue === LEGACY_DEFAULT_GOOGLE_SHEET_URL ||
+    normalizedValue === PREVIOUS_DEFAULT_GOOGLE_SHEET_URL ||
+    extractSpreadsheetId(normalizedValue) === previousGoogleId
+  );
 }
 
 export function normalizeSystemSettings(input?: Partial<SystemSettings> | null): SystemSettings {
@@ -66,7 +61,7 @@ export function normalizeSystemSettings(input?: Partial<SystemSettings> | null):
   };
 
   if (shouldUseNewDefaultSheetSource(mergedSettings.googleSheetsId)) {
-    mergedSettings.googleSheetsId = DEFAULT_GOOGLE_SHEET_URL;
+    mergedSettings.googleSheetsId = DEFAULT_EXTERNAL_WORKBOOK_URL;
 
     if (!mergedSettings.sheetName || mergedSettings.sheetName.trim() === 'თებერვალი') {
       mergedSettings.sheetName = '';

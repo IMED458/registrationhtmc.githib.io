@@ -344,16 +344,16 @@ export default function AdminSettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Google Integration Settings */}
+        {/* Excel Source Settings */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-2">
               <Database className="w-5 h-5 text-emerald-600" />
-              <h3 className="font-bold text-slate-700">Google Drive / Sheets ინტეგრაცია</h3>
+              <h3 className="font-bold text-slate-700">Excel წყაროს ინტეგრაცია</h3>
             </div>
             <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Google Sheets ბმული ან ID</label>
+                <label className="text-sm font-bold text-slate-700">Excel / OneDrive / Google Sheets ბმული</label>
                 <input
                   type="text"
                   disabled={!canEditAdminContent}
@@ -362,7 +362,7 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setSettings({ ...settings, googleSheetsId: e.target.value })}
                 />
                 <p className="text-xs text-slate-400">
-                  შეგიძლიათ მიუთითოთ სრული Google Sheets ბმული. ამჟამინდელი წყარო უკვე შევსებულია.
+                  შეგიძლიათ მიუთითოთ სრული Excel წყაროს ბმული. OneDrive ბმულიც მხარდაჭერილია, თუ ფაილი საჯაროდ იკითხება.
                 </p>
               </div>
               <div className="space-y-2">
@@ -375,7 +375,7 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setSettings({ ...settings, googleAppsScriptUrl: e.target.value })}
                 />
                 <p className="text-xs text-slate-400">
-                  უფასო სინქისთვის ჩასვით Apps Script-ის `exec` ბმული. ეს გამოიყენება H და I სვეტების ჩასაწერად.
+                  ეს გამოიყენება მხოლოდ Google Sheets წყაროზე H და I სვეტების ჩასაწერად. OneDrive წყაროზე read-only წამოღებაა ჩართული.
                 </p>
               </div>
               <div className="space-y-2">

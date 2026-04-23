@@ -42,9 +42,9 @@ app.post('/external/lookup', async (request, response) => {
 
     return response.json(patient);
   } catch (error) {
-    console.error('Google Sheets lookup error:', error);
+    console.error('Workbook lookup error:', error);
     return response.status(500).json({
-      error: 'Failed to fetch from Google Sheets',
+      error: 'Failed to fetch from workbook source',
       details: error instanceof Error ? error.message : 'unknown-error',
     });
   }
@@ -84,9 +84,9 @@ app.post('/external/sync-request', async (request, response) => {
       ...result,
     });
   } catch (error) {
-    console.error('Google Sheets sync error:', error);
+    console.error('Workbook sync error:', error);
     return response.status(500).json({
-      error: 'Failed to sync request to Google Sheets',
+      error: 'Failed to sync request to workbook source',
       details: error instanceof Error ? error.message : 'unknown-error',
     });
   }
